@@ -41,6 +41,16 @@
 			"type": "font"
 		},
 		{
+			"name": "PixelOperator8_Bold",
+			"files": [
+				"PixelOperator8-Bold.ttf"
+			],
+			"file_sizes": [
+				18596
+			],
+			"type": "font"
+		},
+		{
 			"name": "alpha_vert",
 			"files": [
 				"alpha.vert.essl",
@@ -107,6 +117,30 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "avatar",
+			"files": [
+				"avatar.png"
+			],
+			"file_sizes": [
+				658
+			],
+			"type": "image",
+			"original_width": 21,
+			"original_height": 21
+		},
+		{
+			"name": "blueFireball",
+			"files": [
+				"blueFireball.png"
+			],
+			"file_sizes": [
+				13162
+			],
+			"type": "image",
+			"original_width": 272,
+			"original_height": 25
 		},
 		{
 			"name": "blurFragmentShader_frag",
@@ -197,28 +231,6 @@
 			"types": []
 		},
 		{
-			"name": "dummy",
-			"files": [
-				"dummy.png"
-			],
-			"file_sizes": [
-				40129
-			],
-			"type": "image",
-			"original_width": 167,
-			"original_height": 183
-		},
-		{
-			"name": "dummy_tsx",
-			"files": [
-				"dummy.tsx"
-			],
-			"file_sizes": [
-				220
-			],
-			"type": "blob"
-		},
-		{
 			"name": "filmGrain_frag",
 			"files": [
 				"filmGrain.frag.essl",
@@ -251,6 +263,18 @@
 				}
 			],
 			"types": []
+		},
+		{
+			"name": "fireball",
+			"files": [
+				"fireball.png"
+			],
+			"file_sizes": [
+				994
+			],
+			"type": "image",
+			"original_width": 66,
+			"original_height": 25
 		},
 		{
 			"name": "fov_frag",
@@ -319,6 +343,42 @@
 				}
 			],
 			"types": []
+		},
+		{
+			"name": "gameOver",
+			"files": [
+				"gameOver.png"
+			],
+			"file_sizes": [
+				17088
+			],
+			"type": "image",
+			"original_width": 231,
+			"original_height": 244
+		},
+		{
+			"name": "gate",
+			"files": [
+				"gate.png"
+			],
+			"file_sizes": [
+				22341
+			],
+			"type": "image",
+			"original_width": 450,
+			"original_height": 85
+		},
+		{
+			"name": "ghost",
+			"files": [
+				"ghost.png"
+			],
+			"file_sizes": [
+				29620
+			],
+			"type": "image",
+			"original_width": 600,
+			"original_height": 420
 		},
 		{
 			"name": "hBlurVertexShader_vert",
@@ -413,6 +473,18 @@
 			]
 		},
 		{
+			"name": "hellsGateIntro",
+			"files": [
+				"hellsGateIntro.jpg"
+			],
+			"file_sizes": [
+				1687533
+			],
+			"type": "image",
+			"original_width": 2560,
+			"original_height": 1700
+		},
+		{
 			"name": "hero",
 			"files": [
 				"hero.png"
@@ -421,42 +493,20 @@
 				45074
 			],
 			"type": "image",
-			"original_width": 679,
-			"original_height": 563
+			"original_width": 720,
+			"original_height": 300
 		},
 		{
-			"name": "hero1",
+			"name": "logo",
 			"files": [
-				"hero1.png"
+				"logo.png"
 			],
 			"file_sizes": [
-				16820
+				25056
 			],
 			"type": "image",
-			"original_width": 225,
-			"original_height": 180
-		},
-		{
-			"name": "jason",
-			"files": [
-				"jason.png"
-			],
-			"file_sizes": [
-				14448
-			],
-			"type": "image",
-			"original_width": 120,
-			"original_height": 362
-		},
-		{
-			"name": "jason_xml",
-			"files": [
-				"jason.xml"
-			],
-			"file_sizes": [
-				3260
-			],
-			"type": "blob"
+			"original_width": 200,
+			"original_height": 149
 		},
 		{
 			"name": "mainfont",
@@ -1300,6 +1350,18 @@
 			"types": []
 		},
 		{
+			"name": "salamander",
+			"files": [
+				"salamander.png"
+			],
+			"file_sizes": [
+				10351
+			],
+			"type": "image",
+			"original_width": 420,
+			"original_height": 160
+		},
+		{
 			"name": "salt",
 			"files": [
 				"salt.png"
@@ -1310,6 +1372,28 @@
 			"type": "image",
 			"original_width": 29,
 			"original_height": 36
+		},
+		{
+			"name": "sand",
+			"files": [
+				"sand.png"
+			],
+			"file_sizes": [
+				27658
+			],
+			"type": "image",
+			"original_width": 160,
+			"original_height": 128
+		},
+		{
+			"name": "sand_tsx",
+			"files": [
+				"sand.tsx"
+			],
+			"file_sizes": [
+				228
+			],
+			"type": "blob"
 		},
 		{
 			"name": "shInverseMask_frag",
@@ -1975,7 +2059,7 @@
 				"testRoom.tmx"
 			],
 			"file_sizes": [
-				4056
+				7487
 			],
 			"type": "blob"
 		},
@@ -1988,8 +2072,20 @@
 				1967
 			],
 			"type": "image",
-			"original_width": 32,
-			"original_height": 416
+			"original_width": 160,
+			"original_height": 128
+		},
+		{
+			"name": "torch",
+			"files": [
+				"torch.png"
+			],
+			"file_sizes": [
+				6376
+			],
+			"type": "image",
+			"original_width": 145,
+			"original_height": 150
 		},
 		{
 			"name": "vBlurVertexShader_vert",
@@ -2078,6 +2174,28 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "yo",
+			"files": [
+				"yo.png"
+			],
+			"file_sizes": [
+				2594
+			],
+			"type": "image",
+			"original_width": 185,
+			"original_height": 504
+		},
+		{
+			"name": "yo_tsx",
+			"files": [
+				"yo.tsx"
+			],
+			"file_sizes": [
+				215
+			],
+			"type": "blob"
 		}
 	]
 }

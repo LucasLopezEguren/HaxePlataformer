@@ -457,21 +457,6 @@ Xml.prototype = {
 		}
 		return HxOverrides.iter(_g);
 	}
-	,firstElement: function() {
-		if(this.nodeType != Xml.Document && this.nodeType != Xml.Element) {
-			throw new js__$Boot_HaxeError("Bad node type, expected Element or Document but found " + _$Xml_XmlType_$Impl_$.toString(this.nodeType));
-		}
-		var _g = 0;
-		var _g1 = this.children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.nodeType == Xml.Element) {
-				return child;
-			}
-		}
-		return null;
-	}
 	,addChild: function(x) {
 		if(this.nodeType != Xml.Document && this.nodeType != Xml.Element) {
 			throw new js__$Boot_HaxeError("Bad node type, expected Element or Document but found " + _$Xml_XmlType_$Impl_$.toString(this.nodeType));
@@ -566,6 +551,26 @@ com_framework_utils_Entity.prototype = {
 	}
 	,limboStart: function() {
 		throw new js__$Boot_HaxeError("override this function recycle object");
+	}
+	,recycle: function(type,arg) {
+		if(this.childrenInLimbo > 0) {
+			var _g = 0;
+			var _g1 = this.children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				if(!child.limbo) {
+					continue;
+				}
+				child.limbo = false;
+				child.dead = false;
+				--this.childrenInLimbo;
+				return child;
+			}
+		}
+		var obj = Type.createInstance(type,arg == null ? [] : arg);
+		this.addChild(obj);
+		return obj;
 	}
 	,die: function() {
 		this.dead = true;
@@ -696,6 +701,8 @@ var com_collision_platformer_Body = function() {
 	this.accelerationY = 0;
 	this.accelerationX = 0;
 	this.bounce = 0;
+	this.lastVelocityY = 0;
+	this.lastVelocityX = 0;
 	this.velocityY = 0;
 	this.velocityX = 0;
 	this.y = 0;
@@ -710,6 +717,8 @@ com_collision_platformer_Body.prototype = {
 		this.touching = 0;
 		this.lastX = this.x;
 		this.lastY = this.y;
+		this.lastVelocityX = this.velocityX;
+		this.lastVelocityY = this.velocityY;
 		this.velocityX += this.accelerationX * dt;
 		this.velocityY += this.accelerationY * dt;
 		if(Math.abs(this.velocityX) > this.maxVelocityX) {
@@ -752,8 +761,8 @@ com_collision_platformer_ICollider.prototype = {
 };
 var com_collision_platformer_CollisionBox = function() {
 	this.collisionAllow = 15;
-	this.height = 0;
-	this.width = 0;
+	this.height = 10;
+	this.width = 10;
 	com_collision_platformer_Body.call(this);
 };
 $hxClasses["com.collision.platformer.CollisionBox"] = com_collision_platformer_CollisionBox;
@@ -816,6 +825,9 @@ com_collision_platformer_CollisionBox.prototype = $extend(com_collision_platform
 					}
 					this.touching |= myCollisionNeededX;
 					boxCollider.touching |= colliderNeededX;
+					if(notifyCallback != null) {
+						notifyCallback(this,collider);
+					}
 					return true;
 				} else if((this.collisionAllow & myCollisionNeededY) > 0 && (boxCollider.collisionAllow & colliderNeededY) > 0) {
 					this.y += overlapY * myPonderation;
@@ -1178,7 +1190,11 @@ com_collision_platformer_Tilemap.prototype = {
 		while(_g < tiles.length) {
 			var tile = tiles[_g];
 			++_g;
-			tileMapDisplay.setTile2(counter++,tile.gid - 1);
+			var flipped_horizontally = tile.gid & -2147483648;
+			var flipped_vertically = tile.gid & 1073741824;
+			var flipped_diagonally = tile.gid & 536870912;
+			var id = tile.gid & 536870911;
+			tileMapDisplay.setTile2(counter++,id - 1,flipped_horizontally != 0,flipped_vertically != 0,flipped_diagonally != 0);
 		}
 		this.display.addChild(tileMapDisplay);
 		return tileMapDisplay;
@@ -1376,6 +1392,8 @@ com_framework_Simulation.prototype = {
 	,__class__: com_framework_Simulation
 };
 var com_framework_utils_Input = function() {
+	this.mouseDeltaY = 0;
+	this.mouseDeltaX = 0;
 	this.screenScale = new com_helpers_FastPoint(1,1);
 	this.mouseIsDown = false;
 	this.mousePressed = false;
@@ -1425,7 +1443,7 @@ com_framework_utils_Input.prototype = {
 		kha_input_Gamepad.notifyOnConnect($bind(this,this.onConnect),$bind(this,this.onDisconnect));
 	}
 	,onConnect: function(aId) {
-		haxe_Log.trace("gamepad " + aId,{ fileName : "com/framework/utils/Input.hx", lineNumber : 83, className : "com.framework.utils.Input", methodName : "onConnect"});
+		haxe_Log.trace("gamepad " + aId,{ fileName : "com/framework/utils/Input.hx", lineNumber : 86, className : "com.framework.utils.Input", methodName : "onConnect"});
 		this.joysticks[aId].onConnect();
 	}
 	,onDisconnect: function(gamePad) {
@@ -1450,6 +1468,8 @@ com_framework_utils_Input.prototype = {
 	}
 	,onTouchEnd: function(id,x,y) {
 		HxOverrides.remove(this.touchActive,id);
+		this.touchPos[id * 2] = x;
+		this.touchPos[id * 2 + 1] = y;
 		--this.activeTouchSpots;
 		if(id == 0) {
 			var _this = this.mousePosition;
@@ -1464,6 +1484,7 @@ com_framework_utils_Input.prototype = {
 			_this.x = x1;
 			_this.y = y1;
 			this.mouseIsDown = false;
+			this.mouseReleased = true;
 		}
 	}
 	,onTouchStart: function(id,x,y) {
@@ -1484,19 +1505,30 @@ com_framework_utils_Input.prototype = {
 			_this.x = x1;
 			_this.y = y1;
 			this.mouseIsDown = true;
+			this.mousePressed = true;
 		}
 	}
-	,onMouseMove: function(x,y,speedX,speedY) {
+	,onMouseMove: function(x,y,moveX,moveY) {
+		this.touchPos[0] = x;
+		this.touchPos[1] = y;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
+		this.mouseDeltaX = moveX;
+		this.mouseDeltaY = moveY;
 	}
 	,onMouseUp: function(button,x,y) {
+		HxOverrides.remove(this.touchActive,0);
+		--this.activeTouchSpots;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
 		this.mouseReleased = button == 0;
 		this.mouseIsDown = button != 0;
 	}
 	,onMouseDown: function(button,x,y) {
+		++this.activeTouchSpots;
+		this.touchActive.push(0);
+		this.touchPos[0] = x;
+		this.touchPos[1] = y;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
 		this.mousePressed = this.mouseIsDown = button == 0;
@@ -1526,6 +1558,8 @@ com_framework_utils_Input.prototype = {
 			++_g;
 			joystick.update();
 		}
+		this.mouseDeltaX = 0;
+		this.mouseDeltaY = 0;
 	}
 	,clearInput: function() {
 		this.mousePressed = false;
@@ -1756,6 +1790,9 @@ com_framework_utils_State.prototype = $extend(com_framework_utils_Entity.prototy
 		state.die();
 		state.destroy();
 	}
+	,changeState: function(state) {
+		com_framework_Simulation.i.changeState(state);
+	}
 	,stageColor: function(r,g,b,a) {
 		if(a == null) {
 			a = 1;
@@ -1839,10 +1876,7 @@ com_framework_utils_VirtualGamepad.prototype = {
 			var button = _g1[_g];
 			++_g;
 			if(button.handleInput(x * this.scaleX,y * this.scaleY)) {
-				button.active = true;
-				button.touchId = id;
-				this.onButtonChange(button.id,1);
-				haxe_Log.trace("button active " + id,{ fileName : "com/framework/utils/VirtualGamepad.hx", lineNumber : 85, className : "com.framework.utils.VirtualGamepad", methodName : "onTouchStart"});
+				this.pressButton(button,id);
 			}
 		}
 		var _g2 = 0;
@@ -1864,17 +1898,28 @@ com_framework_utils_VirtualGamepad.prototype = {
 			this.globalStick.axisX = 0;
 			this.globalStick.axisY = 0;
 			this.globalStick.touchId = id;
-			haxe_Log.trace("globalStick active " + id,{ fileName : "com/framework/utils/VirtualGamepad.hx", lineNumber : 105, className : "com.framework.utils.VirtualGamepad", methodName : "onTouchStart"});
 		}
 	}
 	,onTouchMove: function(id,x,y) {
 		this.scaleX = com_framework_utils_Input.i.screenScale.x;
 		this.scaleY = com_framework_utils_Input.i.screenScale.y;
 		var _g = 0;
-		var _g1 = this.sticksTouch;
+		var _g1 = this.buttonsTouch;
 		while(_g < _g1.length) {
-			var stick = _g1[_g];
+			var button = _g1[_g];
 			++_g;
+			var inside = button.handleInput(x * this.scaleX,y * this.scaleY);
+			if(inside && !button.active) {
+				this.pressButton(button,id);
+			} else if(!inside && button.active && button.touchId == id) {
+				this.releaseButton(button);
+			}
+		}
+		var _g2 = 0;
+		var _g3 = this.sticksTouch;
+		while(_g2 < _g3.length) {
+			var stick = _g3[_g2];
+			++_g2;
 			if(stick.touchId == id) {
 				stick.handleInput(x * this.scaleX,y * this.scaleY);
 				this.onAxisChange(stick.idX,stick.axisX);
@@ -1896,9 +1941,7 @@ com_framework_utils_VirtualGamepad.prototype = {
 			var button = _g1[_g];
 			++_g;
 			if(button.touchId == id) {
-				button.active = false;
-				this.onButtonChange(button.id,0);
-				button.touchId = -1;
+				this.releaseButton(button);
 			}
 		}
 		var _g2 = 0;
@@ -1920,6 +1963,16 @@ com_framework_utils_VirtualGamepad.prototype = {
 			this.globalStick.touchId = -1;
 		}
 	}
+	,pressButton: function(button,touchId) {
+		button.active = true;
+		button.touchId = touchId;
+		this.onButtonChange(button.id,1);
+	}
+	,releaseButton: function(button) {
+		button.active = false;
+		this.onButtonChange(button.id,0);
+		button.touchId = -1;
+	}
 	,onKeyDown: function(key) {
 		if(!this.keyButton.h.hasOwnProperty(key)) {
 			return;
@@ -1936,16 +1989,12 @@ com_framework_utils_VirtualGamepad.prototype = {
 	}
 	,__class__: com_framework_utils_VirtualGamepad
 };
-var com_framework_utils_VirtualButton = function() {
-	this.touchId = -1;
-};
-$hxClasses["com.framework.utils.VirtualButton"] = com_framework_utils_VirtualButton;
-com_framework_utils_VirtualButton.__name__ = "com.framework.utils.VirtualButton";
-com_framework_utils_VirtualButton.prototype = {
-	handleInput: function(x,y) {
-		return (x - this.x) * (x - this.x) + (y - this.y) * (y - this.y) < this.radio * this.radio;
-	}
-	,__class__: com_framework_utils_VirtualButton
+var com_framework_utils_VirtualInput = function() { };
+$hxClasses["com.framework.utils.VirtualInput"] = com_framework_utils_VirtualInput;
+com_framework_utils_VirtualInput.__name__ = "com.framework.utils.VirtualInput";
+com_framework_utils_VirtualInput.__isInterface__ = true;
+com_framework_utils_VirtualInput.prototype = {
+	__class__: com_framework_utils_VirtualInput
 };
 var com_framework_utils_VirtualStick = function() {
 	this.touchId = -1;
@@ -2266,7 +2315,7 @@ com_gEngine_GEngine.init = function(virtualWidth,virtualHeight,oversample,antiAl
 	com_gEngine_GEngine.virtualWidth = virtualWidth;
 	com_gEngine_GEngine.virtualHeight = virtualHeight;
 	com_gEngine_GEngine.i = new com_gEngine_GEngine(oversample,antiAlias);
-	kha_Assets.loadFont("mainfont",com_gEngine_GEngine.setFont,null,{ fileName : "com/gEngine/GEngine.hx", lineNumber : 153, className : "com.gEngine.GEngine", methodName : "init"});
+	kha_Assets.loadFont("mainfont",com_gEngine_GEngine.setFont,null,{ fileName : "com/gEngine/GEngine.hx", lineNumber : 156, className : "com.gEngine.GEngine", methodName : "init"});
 };
 com_gEngine_GEngine.setFont = function(aFont) {
 	com_gEngine_GEngine.get_i().font = aFont;
@@ -2309,6 +2358,54 @@ com_gEngine_GEngine.prototype = {
 		var tx = -right / right;
 		var ty = -bottom / (0 - bottom);
 		this.modelViewMatrix = new kha_math_FastMatrix4(2 / right,0,0,tx,0,2.0 / (0 - bottom),0,ty,0,0,-0.0004,-1.,0,0,0,1);
+		if(kha_Image.renderTargetsInvertedY()) {
+			var _this = this.modelViewMatrix;
+			var _this__00 = 1;
+			var _this__10 = 0;
+			var _this__20 = 0;
+			var _this__30 = 0;
+			var _this__01 = 0;
+			var _this__11 = -1;
+			var _this__21 = 0;
+			var _this__31 = 0;
+			var _this__02 = 0;
+			var _this__12 = 0;
+			var _this__22 = 1;
+			var _this__32 = 0;
+			var _this__03 = 0;
+			var _this__13 = 0;
+			var _this__23 = 0;
+			var _this__33 = 1;
+			var m = this.modelViewMatrix;
+			var _01 = _this__01 * m._00 + _this__11 * m._01 + _this__21 * m._02 + _this__31 * m._03;
+			var _11 = _this__01 * m._10 + _this__11 * m._11 + _this__21 * m._12 + _this__31 * m._13;
+			var _21 = _this__01 * m._20 + _this__11 * m._21 + _this__21 * m._22 + _this__31 * m._23;
+			var _31 = _this__01 * m._30 + _this__11 * m._31 + _this__21 * m._32 + _this__31 * m._33;
+			var _02 = _this__02 * m._00 + _this__12 * m._01 + _this__22 * m._02 + _this__32 * m._03;
+			var _12 = _this__02 * m._10 + _this__12 * m._11 + _this__22 * m._12 + _this__32 * m._13;
+			var _22 = _this__02 * m._20 + _this__12 * m._21 + _this__22 * m._22 + _this__32 * m._23;
+			var _32 = _this__02 * m._30 + _this__12 * m._31 + _this__22 * m._32 + _this__32 * m._33;
+			var _03 = _this__03 * m._00 + _this__13 * m._01 + _this__23 * m._02 + _this__33 * m._03;
+			var _13 = _this__03 * m._10 + _this__13 * m._11 + _this__23 * m._12 + _this__33 * m._13;
+			var _23 = _this__03 * m._20 + _this__13 * m._21 + _this__23 * m._22 + _this__33 * m._23;
+			var _33 = _this__03 * m._30 + _this__13 * m._31 + _this__23 * m._32 + _this__33 * m._33;
+			_this._00 = _this__00 * m._00 + _this__10 * m._01 + _this__20 * m._02 + _this__30 * m._03;
+			_this._10 = _this__00 * m._10 + _this__10 * m._11 + _this__20 * m._12 + _this__30 * m._13;
+			_this._20 = _this__00 * m._20 + _this__10 * m._21 + _this__20 * m._22 + _this__30 * m._23;
+			_this._30 = _this__00 * m._30 + _this__10 * m._31 + _this__20 * m._32 + _this__30 * m._33;
+			_this._01 = _01;
+			_this._11 = _11;
+			_this._21 = _21;
+			_this._31 = _31;
+			_this._02 = _02;
+			_this._12 = _12;
+			_this._22 = _22;
+			_this._32 = _32;
+			_this._03 = _03;
+			_this._13 = _13;
+			_this._23 = _23;
+			_this._33 = _33;
+		}
 		return true;
 	}
 	,createDefaultPainters: function() {
@@ -2364,7 +2461,7 @@ com_gEngine_GEngine.prototype = {
 	}
 	,endCanvas: function() {
 		if(!this.currentCanvasActive) {
-			haxe_Log.trace("Warning :start buffer before you end it",{ fileName : "com/gEngine/GEngine.hx", lineNumber : 266, className : "com.gEngine.GEngine", methodName : "endCanvas"});
+			haxe_Log.trace("Warning :start buffer before you end it",{ fileName : "com/gEngine/GEngine.hx", lineNumber : 269, className : "com.gEngine.GEngine", methodName : "endCanvas"});
 		}
 		if(this.currentCanvasActive) {
 			this.currentCanvas().get_g4().end();
@@ -2373,7 +2470,7 @@ com_gEngine_GEngine.prototype = {
 	}
 	,beginCanvas: function() {
 		if(this.currentCanvasActive) {
-			haxe_Log.trace("Warning :end buffer before you start ",{ fileName : "com/gEngine/GEngine.hx", lineNumber : 278, className : "com.gEngine.GEngine", methodName : "beginCanvas"});
+			haxe_Log.trace("Warning :end buffer before you start ",{ fileName : "com/gEngine/GEngine.hx", lineNumber : 281, className : "com.gEngine.GEngine", methodName : "beginCanvas"});
 		}
 		if(!this.currentCanvasActive) {
 			this.currentCanvas().get_g4().begin();
@@ -2931,48 +3028,13 @@ com_gEngine_display_Camera.prototype = {
 		this.orthogonal = this.createOrthogonalProjection();
 	}
 	,createOrthogonalProjection: function() {
-		if(kha_Image.renderTargetsInvertedY()) {
-			var _this__00 = 1;
-			var _this__10 = 0;
-			var _this__20 = 0;
-			var _this__30 = 0;
-			var _this__01 = 0;
-			var _this__11 = -1;
-			var _this__21 = 0;
-			var _this__31 = 0;
-			var _this__02 = 0;
-			var _this__12 = 0;
-			var _this__22 = 1;
-			var _this__32 = 0;
-			var _this__03 = 0;
-			var _this__13 = 0;
-			var _this__23 = 0;
-			var _this__33 = 1;
-			var left = -this.width * 0.5;
-			var right = this.width * 0.5;
-			var bottom = this.height * 0.5;
-			var top = -this.height * 0.5;
-			var tx = -(right + left) / (right - left);
-			var ty = -(top + bottom) / (top - bottom);
-			var m__00 = 2 / (right - left);
-			var m__10 = 0;
-			var m__01 = 0;
-			var m__11 = 2.0 / (top - bottom);
-			var m__02 = 0;
-			var m__12 = 0;
-			var m__03 = 0;
-			var m__13 = 0;
-			var m__33 = 1;
-			return new kha_math_FastMatrix4(_this__00 * m__00 + _this__10 * m__01 + _this__20 * m__02 + _this__30 * m__03,_this__00 * m__10 + _this__10 * m__11 + _this__20 * m__12 + _this__30 * m__13,0.,_this__00 * tx + _this__10 * ty + _this__30 * m__33,_this__01 * m__00 + _this__11 * m__01 + _this__21 * m__02 + _this__31 * m__03,_this__01 * m__10 + _this__11 * m__11 + _this__21 * m__12 + _this__31 * m__13,0.,_this__01 * tx + _this__11 * ty + _this__31 * m__33,_this__02 * m__00 + _this__12 * m__01 + _this__22 * m__02 + _this__32 * m__03,_this__02 * m__10 + _this__12 * m__11 + _this__22 * m__12 + _this__32 * m__13,-0.0002,_this__02 * tx + _this__12 * ty + _this__32 * m__33,_this__03 * m__00 + _this__13 * m__01 + _this__23 * m__02 + _this__33 * m__03,_this__03 * m__10 + _this__13 * m__11 + _this__23 * m__12 + _this__33 * m__13,0.,_this__03 * tx + _this__13 * ty + _this__33 * m__33);
-		} else {
-			var left1 = -this.width * 0.5;
-			var right1 = this.width * 0.5;
-			var bottom1 = this.height * 0.5;
-			var top1 = -this.height * 0.5;
-			var tx1 = -(right1 + left1) / (right1 - left1);
-			var ty1 = -(top1 + bottom1) / (top1 - bottom1);
-			return new kha_math_FastMatrix4(2 / (right1 - left1),0,0,tx1,0,2.0 / (top1 - bottom1),0,ty1,0,0,-0.0002,0.,0,0,0,1);
-		}
+		var left = -this.width * 0.5;
+		var right = this.width * 0.5;
+		var bottom = this.height * 0.5;
+		var top = -this.height * 0.5;
+		var tx = -(right + left) / (right - left);
+		var ty = -(top + bottom) / (top - bottom);
+		return new kha_math_FastMatrix4(2 / (right - left),0,0,tx,0,2.0 / (top - bottom),0,ty,0,0,-0.0002,0.,0,0,0,1);
 	}
 	,createScreenTransform: function() {
 		if(kha_Image.renderTargetsInvertedY()) {
@@ -3149,9 +3211,6 @@ $hxClasses["com.gEngine.display.IAnimation"] = com_gEngine_display_IAnimation;
 com_gEngine_display_IAnimation.__name__ = "com.gEngine.display.IAnimation";
 com_gEngine_display_IAnimation.__isInterface__ = true;
 com_gEngine_display_IAnimation.__interfaces__ = [com_gEngine_display_IDraw];
-com_gEngine_display_IAnimation.prototype = {
-	__class__: com_gEngine_display_IAnimation
-};
 var com_gEngine_display_IContainer = function() { };
 $hxClasses["com.gEngine.display.IContainer"] = com_gEngine_display_IContainer;
 com_gEngine_display_IContainer.__name__ = "com.gEngine.display.IContainer";
@@ -3174,6 +3233,7 @@ var com_gEngine_display_Layer = function() {
 	this.mulB = 1;
 	this.mulG = 1;
 	this.mulR = 1;
+	this.colorTransform = false;
 	this.billboard = false;
 	this.scaleArea = new com_helpers_MinMax();
 	this.visible = true;
@@ -3196,7 +3256,14 @@ $hxClasses["com.gEngine.display.Layer"] = com_gEngine_display_Layer;
 com_gEngine_display_Layer.__name__ = "com.gEngine.display.Layer";
 com_gEngine_display_Layer.__interfaces__ = [com_gEngine_display_IContainer,com_gEngine_display_IDraw];
 com_gEngine_display_Layer.prototype = {
-	render: function(paintMode,transform) {
+	setColorMultiply: function(r,g,b,a) {
+		this.mulR = r;
+		this.mulB = b;
+		this.mulG = g;
+		this.mulA = a;
+		this.colorTransform = true;
+	}
+	,render: function(paintMode,transform) {
 		var x = -this.pivotX;
 		var y = -this.pivotY;
 		var model__00 = 1;
@@ -4098,11 +4165,13 @@ var com_gEngine_display_Sprite = function(name) {
 	this.colorTransform = false;
 	this.alpha = 1;
 	this.visible = true;
+	this.offsetZ = 0;
 	this.offsetY = 0;
 	this.offsetX = 0;
 	this.pivotY = 0;
 	this.pivotX = 0;
 	this.blend = 0;
+	this.scaleZ = 1;
 	this.scaleY = 1;
 	this.scaleX = 1;
 	this.z = 0;
@@ -4149,26 +4218,264 @@ com_gEngine_display_Sprite.prototype = {
 		if(this.filter != null) {
 			this.filter.filterStart(this,paintMode,transform);
 		}
+		var _this = this.transform;
+		var m__00 = 1;
+		var m__10 = 0;
+		var m__20 = 0;
+		var m__30 = 0;
+		var m__01 = 0;
+		var m__11 = 1;
+		var m__21 = 0;
+		var m__31 = 0;
+		var m__02 = 0;
+		var m__12 = 0;
+		var m__22 = 1;
+		var m__32 = 0;
+		var m__03 = 0;
+		var m__13 = 0;
+		var m__23 = 0;
+		var m__33 = 1;
+		_this._00 = m__00;
+		_this._10 = m__10;
+		_this._20 = m__20;
+		_this._30 = m__30;
+		_this._01 = m__01;
+		_this._11 = m__11;
+		_this._21 = m__21;
+		_this._31 = m__31;
+		_this._02 = m__02;
+		_this._12 = m__12;
+		_this._22 = m__22;
+		_this._32 = m__32;
+		_this._03 = m__03;
+		_this._13 = m__13;
+		_this._23 = m__23;
+		_this._33 = m__33;
 		this.transform._00 = this.cosAng * this.scaleX;
 		this.transform._10 = -this.sinAng * this.scaleY;
 		this.transform._30 = this.x + this.pivotX;
 		this.transform._01 = this.sinAng * this.scaleX;
 		this.transform._11 = this.cosAng * this.scaleY;
 		this.transform._31 = this.y + this.pivotY;
+		this.transform._22 = this.scaleZ;
 		this.transform._32 = this.z;
-		var m = this.transform;
-		var _00 = transform._00 * m._00 + transform._10 * m._01 + transform._20 * m._02 + transform._30 * m._03;
-		var _10 = transform._00 * m._10 + transform._10 * m._11 + transform._20 * m._12 + transform._30 * m._13;
-		var _20 = transform._00 * m._20 + transform._10 * m._21 + transform._20 * m._22 + transform._30 * m._23;
-		var _30 = transform._00 * m._30 + transform._10 * m._31 + transform._20 * m._32 + transform._30 * m._33;
-		var _01 = transform._01 * m._00 + transform._11 * m._01 + transform._21 * m._02 + transform._31 * m._03;
-		var _11 = transform._01 * m._10 + transform._11 * m._11 + transform._21 * m._12 + transform._31 * m._13;
-		var _21 = transform._01 * m._20 + transform._11 * m._21 + transform._21 * m._22 + transform._31 * m._23;
-		var _31 = transform._01 * m._30 + transform._11 * m._31 + transform._21 * m._32 + transform._31 * m._33;
-		var _02 = transform._02 * m._00 + transform._12 * m._01 + transform._22 * m._02 + transform._32 * m._03;
-		var _12 = transform._02 * m._10 + transform._12 * m._11 + transform._22 * m._12 + transform._32 * m._13;
-		var _22 = transform._02 * m._20 + transform._12 * m._21 + transform._22 * m._22 + transform._32 * m._23;
-		var _32 = transform._02 * m._30 + transform._12 * m._31 + transform._22 * m._32 + transform._32 * m._33;
+		if(this.billboard) {
+			var m3 = transform._12;
+			var m4 = transform._22;
+			var m5 = transform._32;
+			var m6 = transform._13;
+			var m7 = transform._23;
+			var m8 = transform._33;
+			var c00 = transform._11 * (m4 * m8 - m5 * m7) - transform._21 * (m3 * m8 - m5 * m6) + transform._31 * (m3 * m7 - m4 * m6);
+			var m31 = transform._12;
+			var m41 = transform._22;
+			var m51 = transform._32;
+			var m61 = transform._13;
+			var m71 = transform._23;
+			var m81 = transform._33;
+			var c01 = transform._10 * (m41 * m81 - m51 * m71) - transform._20 * (m31 * m81 - m51 * m61) + transform._30 * (m31 * m71 - m41 * m61);
+			var m32 = transform._11;
+			var m42 = transform._21;
+			var m52 = transform._31;
+			var m62 = transform._13;
+			var m72 = transform._23;
+			var m82 = transform._33;
+			var c02 = transform._10 * (m42 * m82 - m52 * m72) - transform._20 * (m32 * m82 - m52 * m62) + transform._30 * (m32 * m72 - m42 * m62);
+			var m33 = transform._11;
+			var m43 = transform._21;
+			var m53 = transform._31;
+			var m63 = transform._12;
+			var m73 = transform._22;
+			var m83 = transform._32;
+			var c03 = transform._10 * (m43 * m83 - m53 * m73) - transform._20 * (m33 * m83 - m53 * m63) + transform._30 * (m33 * m73 - m43 * m63);
+			var det = transform._00 * c00 - transform._01 * c01 + transform._02 * c02 - transform._03 * c03;
+			if(Math.abs(det) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var m34 = transform._02;
+			var m44 = transform._22;
+			var m54 = transform._32;
+			var m64 = transform._03;
+			var m74 = transform._23;
+			var m84 = transform._33;
+			var c10 = transform._01 * (m44 * m84 - m54 * m74) - transform._21 * (m34 * m84 - m54 * m64) + transform._31 * (m34 * m74 - m44 * m64);
+			var m35 = transform._02;
+			var m45 = transform._22;
+			var m55 = transform._32;
+			var m65 = transform._03;
+			var m75 = transform._23;
+			var m85 = transform._33;
+			var c11 = transform._00 * (m45 * m85 - m55 * m75) - transform._20 * (m35 * m85 - m55 * m65) + transform._30 * (m35 * m75 - m45 * m65);
+			var m36 = transform._01;
+			var m46 = transform._21;
+			var m56 = transform._31;
+			var m66 = transform._03;
+			var m76 = transform._23;
+			var m86 = transform._33;
+			var c12 = transform._00 * (m46 * m86 - m56 * m76) - transform._20 * (m36 * m86 - m56 * m66) + transform._30 * (m36 * m76 - m46 * m66);
+			var m37 = transform._01;
+			var m47 = transform._21;
+			var m57 = transform._31;
+			var m67 = transform._02;
+			var m77 = transform._22;
+			var m87 = transform._32;
+			var c13 = transform._00 * (m47 * m87 - m57 * m77) - transform._20 * (m37 * m87 - m57 * m67) + transform._30 * (m37 * m77 - m47 * m67);
+			var m38 = transform._02;
+			var m48 = transform._12;
+			var m58 = transform._32;
+			var m68 = transform._03;
+			var m78 = transform._13;
+			var m88 = transform._33;
+			var c20 = transform._01 * (m48 * m88 - m58 * m78) - transform._11 * (m38 * m88 - m58 * m68) + transform._31 * (m38 * m78 - m48 * m68);
+			var m39 = transform._02;
+			var m49 = transform._12;
+			var m59 = transform._32;
+			var m69 = transform._03;
+			var m79 = transform._13;
+			var m89 = transform._33;
+			var c21 = transform._00 * (m49 * m89 - m59 * m79) - transform._10 * (m39 * m89 - m59 * m69) + transform._30 * (m39 * m79 - m49 * m69);
+			var m310 = transform._01;
+			var m410 = transform._11;
+			var m510 = transform._31;
+			var m610 = transform._03;
+			var m710 = transform._13;
+			var m810 = transform._33;
+			var c22 = transform._00 * (m410 * m810 - m510 * m710) - transform._10 * (m310 * m810 - m510 * m610) + transform._30 * (m310 * m710 - m410 * m610);
+			var m311 = transform._01;
+			var m411 = transform._11;
+			var m511 = transform._31;
+			var m611 = transform._02;
+			var m711 = transform._12;
+			var m811 = transform._32;
+			var c23 = transform._00 * (m411 * m811 - m511 * m711) - transform._10 * (m311 * m811 - m511 * m611) + transform._30 * (m311 * m711 - m411 * m611);
+			var m312 = transform._02;
+			var m412 = transform._12;
+			var m512 = transform._22;
+			var m612 = transform._03;
+			var m712 = transform._13;
+			var m812 = transform._23;
+			var c30 = transform._01 * (m412 * m812 - m512 * m712) - transform._11 * (m312 * m812 - m512 * m612) + transform._21 * (m312 * m712 - m412 * m612);
+			var m313 = transform._02;
+			var m413 = transform._12;
+			var m513 = transform._22;
+			var m613 = transform._03;
+			var m713 = transform._13;
+			var m813 = transform._23;
+			var c31 = transform._00 * (m413 * m813 - m513 * m713) - transform._10 * (m313 * m813 - m513 * m613) + transform._20 * (m313 * m713 - m413 * m613);
+			var m314 = transform._01;
+			var m414 = transform._11;
+			var m514 = transform._21;
+			var m614 = transform._03;
+			var m714 = transform._13;
+			var m814 = transform._23;
+			var c32 = transform._00 * (m414 * m814 - m514 * m714) - transform._10 * (m314 * m814 - m514 * m614) + transform._20 * (m314 * m714 - m414 * m614);
+			var m315 = transform._01;
+			var m415 = transform._11;
+			var m515 = transform._21;
+			var m615 = transform._02;
+			var m715 = transform._12;
+			var m815 = transform._22;
+			var c33 = transform._00 * (m415 * m815 - m515 * m715) - transform._10 * (m315 * m815 - m515 * m615) + transform._20 * (m315 * m715 - m415 * m615);
+			var invdet = 1.0 / det;
+			var rotation__00 = c00 * invdet;
+			var rotation__10 = -c01 * invdet;
+			var rotation__20 = c02 * invdet;
+			var rotation__30 = -c03 * invdet;
+			var rotation__01 = -c10 * invdet;
+			var rotation__11 = c11 * invdet;
+			var rotation__21 = -c12 * invdet;
+			var rotation__31 = c13 * invdet;
+			var rotation__02 = c20 * invdet;
+			var rotation__12 = -c21 * invdet;
+			var rotation__22 = c22 * invdet;
+			var rotation__32 = -c23 * invdet;
+			var rotation__03 = -c30 * invdet;
+			var rotation__13 = c31 * invdet;
+			var rotation__23 = -c32 * invdet;
+			var rotation__33 = c33 * invdet;
+			rotation__32 = 0;
+			rotation__31 = rotation__32;
+			rotation__30 = rotation__31;
+			var _this1 = this.transform;
+			var _this2 = this.transform;
+			var _10 = _this2._00 * rotation__10 + _this2._10 * rotation__11 + _this2._20 * rotation__12 + _this2._30 * rotation__13;
+			var _20 = _this2._00 * rotation__20 + _this2._10 * rotation__21 + _this2._20 * rotation__22 + _this2._30 * rotation__23;
+			var _30 = _this2._00 * rotation__30 + _this2._10 * rotation__31 + _this2._20 * rotation__32 + _this2._30 * rotation__33;
+			var _11 = _this2._01 * rotation__10 + _this2._11 * rotation__11 + _this2._21 * rotation__12 + _this2._31 * rotation__13;
+			var _21 = _this2._01 * rotation__20 + _this2._11 * rotation__21 + _this2._21 * rotation__22 + _this2._31 * rotation__23;
+			var _31 = _this2._01 * rotation__30 + _this2._11 * rotation__31 + _this2._21 * rotation__32 + _this2._31 * rotation__33;
+			var _12 = _this2._02 * rotation__10 + _this2._12 * rotation__11 + _this2._22 * rotation__12 + _this2._32 * rotation__13;
+			var _22 = _this2._02 * rotation__20 + _this2._12 * rotation__21 + _this2._22 * rotation__22 + _this2._32 * rotation__23;
+			var _32 = _this2._02 * rotation__30 + _this2._12 * rotation__31 + _this2._22 * rotation__32 + _this2._32 * rotation__33;
+			var _13 = _this2._03 * rotation__10 + _this2._13 * rotation__11 + _this2._23 * rotation__12 + _this2._33 * rotation__13;
+			var _23 = _this2._03 * rotation__20 + _this2._13 * rotation__21 + _this2._23 * rotation__22 + _this2._33 * rotation__23;
+			var _33 = _this2._03 * rotation__30 + _this2._13 * rotation__31 + _this2._23 * rotation__32 + _this2._33 * rotation__33;
+			_this1._00 = _this2._00 * rotation__00 + _this2._10 * rotation__01 + _this2._20 * rotation__02 + _this2._30 * rotation__03;
+			_this1._10 = _10;
+			_this1._20 = _20;
+			_this1._30 = _30;
+			_this1._01 = _this2._01 * rotation__00 + _this2._11 * rotation__01 + _this2._21 * rotation__02 + _this2._31 * rotation__03;
+			_this1._11 = _11;
+			_this1._21 = _21;
+			_this1._31 = _31;
+			_this1._02 = _this2._02 * rotation__00 + _this2._12 * rotation__01 + _this2._22 * rotation__02 + _this2._32 * rotation__03;
+			_this1._12 = _12;
+			_this1._22 = _22;
+			_this1._32 = _32;
+			_this1._03 = _this2._03 * rotation__00 + _this2._13 * rotation__01 + _this2._23 * rotation__02 + _this2._33 * rotation__03;
+			_this1._13 = _13;
+			_this1._23 = _23;
+			_this1._33 = _33;
+		}
+		if(this.rotation3d != null) {
+			var _this3 = this.transform;
+			var _this4 = this.transform;
+			var m = this.rotation3d;
+			var _101 = _this4._00 * m._10 + _this4._10 * m._11 + _this4._20 * m._12 + _this4._30 * m._13;
+			var _201 = _this4._00 * m._20 + _this4._10 * m._21 + _this4._20 * m._22 + _this4._30 * m._23;
+			var _301 = _this4._00 * m._30 + _this4._10 * m._31 + _this4._20 * m._32 + _this4._30 * m._33;
+			var _01 = _this4._01 * m._00 + _this4._11 * m._01 + _this4._21 * m._02 + _this4._31 * m._03;
+			var _111 = _this4._01 * m._10 + _this4._11 * m._11 + _this4._21 * m._12 + _this4._31 * m._13;
+			var _211 = _this4._01 * m._20 + _this4._11 * m._21 + _this4._21 * m._22 + _this4._31 * m._23;
+			var _311 = _this4._01 * m._30 + _this4._11 * m._31 + _this4._21 * m._32 + _this4._31 * m._33;
+			var _02 = _this4._02 * m._00 + _this4._12 * m._01 + _this4._22 * m._02 + _this4._32 * m._03;
+			var _121 = _this4._02 * m._10 + _this4._12 * m._11 + _this4._22 * m._12 + _this4._32 * m._13;
+			var _221 = _this4._02 * m._20 + _this4._12 * m._21 + _this4._22 * m._22 + _this4._32 * m._23;
+			var _321 = _this4._02 * m._30 + _this4._12 * m._31 + _this4._22 * m._32 + _this4._32 * m._33;
+			var _03 = _this4._03 * m._00 + _this4._13 * m._01 + _this4._23 * m._02 + _this4._33 * m._03;
+			var _131 = _this4._03 * m._10 + _this4._13 * m._11 + _this4._23 * m._12 + _this4._33 * m._13;
+			var _231 = _this4._03 * m._20 + _this4._13 * m._21 + _this4._23 * m._22 + _this4._33 * m._23;
+			var _331 = _this4._03 * m._30 + _this4._13 * m._31 + _this4._23 * m._32 + _this4._33 * m._33;
+			_this3._00 = _this4._00 * m._00 + _this4._10 * m._01 + _this4._20 * m._02 + _this4._30 * m._03;
+			_this3._10 = _101;
+			_this3._20 = _201;
+			_this3._30 = _301;
+			_this3._01 = _01;
+			_this3._11 = _111;
+			_this3._21 = _211;
+			_this3._31 = _311;
+			_this3._02 = _02;
+			_this3._12 = _121;
+			_this3._22 = _221;
+			_this3._32 = _321;
+			_this3._03 = _03;
+			_this3._13 = _131;
+			_this3._23 = _231;
+			_this3._33 = _331;
+		}
+		var m1 = this.transform;
+		var _00 = transform._00 * m1._00 + transform._10 * m1._01 + transform._20 * m1._02 + transform._30 * m1._03;
+		var _102 = transform._00 * m1._10 + transform._10 * m1._11 + transform._20 * m1._12 + transform._30 * m1._13;
+		var _202 = transform._00 * m1._20 + transform._10 * m1._21 + transform._20 * m1._22 + transform._30 * m1._23;
+		var _302 = transform._00 * m1._30 + transform._10 * m1._31 + transform._20 * m1._32 + transform._30 * m1._33;
+		var _011 = transform._01 * m1._00 + transform._11 * m1._01 + transform._21 * m1._02 + transform._31 * m1._03;
+		var _112 = transform._01 * m1._10 + transform._11 * m1._11 + transform._21 * m1._12 + transform._31 * m1._13;
+		var _212 = transform._01 * m1._20 + transform._11 * m1._21 + transform._21 * m1._22 + transform._31 * m1._23;
+		var _312 = transform._01 * m1._30 + transform._11 * m1._31 + transform._21 * m1._32 + transform._31 * m1._33;
+		var _021 = transform._02 * m1._00 + transform._12 * m1._01 + transform._22 * m1._02 + transform._32 * m1._03;
+		var _122 = transform._02 * m1._10 + transform._12 * m1._11 + transform._22 * m1._12 + transform._32 * m1._13;
+		var _222 = transform._02 * m1._20 + transform._12 * m1._21 + transform._22 * m1._22 + transform._32 * m1._23;
+		var _322 = transform._02 * m1._30 + transform._12 * m1._31 + transform._22 * m1._32 + transform._32 * m1._33;
 		var vertexX;
 		var vertexY;
 		var frame = this.animationData.frames[this.timeline.currentFrame];
@@ -4179,9 +4486,10 @@ com_gEngine_display_Sprite.prototype = {
 		this.paintInfo.textureFilter = this.textureFilter;
 		this.paintInfo.texture = this.textureId;
 		var cameraScale = paintMode.camera.scale;
-		if(this.colorTransform || paintMode.colorTransform) {
-			var painter = com_gEngine_GEngine.get_i().getColorTransformPainter(this.blend);
+		if(this.colorTransform || paintMode.colorTransform || this.customPainter != null) {
+			var painter = this.customPainter != null ? this.customPainter : com_gEngine_GEngine.get_i().getColorTransformPainter(this.blend);
 			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter);
+			painter = paintMode.currentPainter;
 			var buffer = painter.getVertexBuffer();
 			var vertexBufferCounter = painter.getVertexDataCounter();
 			var redMul = this.mulRed * paintMode.mulR;
@@ -4192,160 +4500,6 @@ com_gEngine_display_Sprite.prototype = {
 			var greenAdd = this.addGreen;
 			var blueAdd = this.addBlue;
 			var alphaAdd = this.addAlpha;
-			vertexX = vertexs[0] - this.pivotX;
-			vertexY = vertexs[1] - this.pivotY;
-			var x = vertexX;
-			var y = vertexY;
-			if(y == null) {
-				y = 0;
-			}
-			if(x == null) {
-				x = 0;
-			}
-			var value_x = x;
-			var value_y = y;
-			var value_z = 0;
-			var value_w = 1;
-			var pos_x = 0;
-			var pos_y = 0;
-			var pos_z = 0;
-			pos_x = _00 * value_x + _10 * value_y + _20 * value_z + _30 * value_w;
-			pos_y = _01 * value_x + _11 * value_y + _21 * value_z + _31 * value_w;
-			pos_z = _02 * value_x + _12 * value_y + _22 * value_z + _32 * value_w;
-			var u = uvs[0];
-			var v = uvs[1];
-			var offsetPos = vertexBufferCounter;
-			buffer[offsetPos++] = pos_x + this.offsetX * cameraScale;
-			buffer[offsetPos++] = pos_y + this.offsetY * cameraScale;
-			buffer[offsetPos++] = pos_z;
-			buffer[offsetPos++] = u;
-			buffer[offsetPos++] = v;
-			buffer[offsetPos++] = redMul;
-			buffer[offsetPos++] = greenMul;
-			buffer[offsetPos++] = blueMul;
-			buffer[offsetPos++] = alphaMul;
-			buffer[offsetPos++] = redAdd;
-			buffer[offsetPos++] = greenAdd;
-			buffer[offsetPos++] = blueAdd;
-			buffer[offsetPos++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[2] - this.pivotX;
-			vertexY = vertexs[3] - this.pivotY;
-			var x1 = vertexX;
-			var y1 = vertexY;
-			if(y1 == null) {
-				y1 = 0;
-			}
-			if(x1 == null) {
-				x1 = 0;
-			}
-			var value_x1 = x1;
-			var value_y1 = y1;
-			var value_z1 = 0;
-			var value_w1 = 1;
-			var pos_x1 = 0;
-			var pos_y1 = 0;
-			var pos_z1 = 0;
-			pos_x1 = _00 * value_x1 + _10 * value_y1 + _20 * value_z1 + _30 * value_w1;
-			pos_y1 = _01 * value_x1 + _11 * value_y1 + _21 * value_z1 + _31 * value_w1;
-			pos_z1 = _02 * value_x1 + _12 * value_y1 + _22 * value_z1 + _32 * value_w1;
-			var u1 = uvs[2];
-			var v1 = uvs[3];
-			var offsetPos1 = vertexBufferCounter;
-			buffer[offsetPos1++] = pos_x1 + this.offsetX * cameraScale;
-			buffer[offsetPos1++] = pos_y1 + this.offsetY * cameraScale;
-			buffer[offsetPos1++] = pos_z1;
-			buffer[offsetPos1++] = u1;
-			buffer[offsetPos1++] = v1;
-			buffer[offsetPos1++] = redMul;
-			buffer[offsetPos1++] = greenMul;
-			buffer[offsetPos1++] = blueMul;
-			buffer[offsetPos1++] = alphaMul;
-			buffer[offsetPos1++] = redAdd;
-			buffer[offsetPos1++] = greenAdd;
-			buffer[offsetPos1++] = blueAdd;
-			buffer[offsetPos1++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[4] - this.pivotX;
-			vertexY = vertexs[5] - this.pivotY;
-			var x2 = vertexX;
-			var y2 = vertexY;
-			if(y2 == null) {
-				y2 = 0;
-			}
-			if(x2 == null) {
-				x2 = 0;
-			}
-			var value_x2 = x2;
-			var value_y2 = y2;
-			var value_z2 = 0;
-			var value_w2 = 1;
-			var pos_x2 = 0;
-			var pos_y2 = 0;
-			var pos_z2 = 0;
-			pos_x2 = _00 * value_x2 + _10 * value_y2 + _20 * value_z2 + _30 * value_w2;
-			pos_y2 = _01 * value_x2 + _11 * value_y2 + _21 * value_z2 + _31 * value_w2;
-			pos_z2 = _02 * value_x2 + _12 * value_y2 + _22 * value_z2 + _32 * value_w2;
-			var u2 = uvs[4];
-			var v2 = uvs[5];
-			var offsetPos2 = vertexBufferCounter;
-			buffer[offsetPos2++] = pos_x2 + this.offsetX * cameraScale;
-			buffer[offsetPos2++] = pos_y2 + this.offsetY * cameraScale;
-			buffer[offsetPos2++] = pos_z2;
-			buffer[offsetPos2++] = u2;
-			buffer[offsetPos2++] = v2;
-			buffer[offsetPos2++] = redMul;
-			buffer[offsetPos2++] = greenMul;
-			buffer[offsetPos2++] = blueMul;
-			buffer[offsetPos2++] = alphaMul;
-			buffer[offsetPos2++] = redAdd;
-			buffer[offsetPos2++] = greenAdd;
-			buffer[offsetPos2++] = blueAdd;
-			buffer[offsetPos2++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[6] - this.pivotX;
-			vertexY = vertexs[7] - this.pivotY;
-			var x3 = vertexX;
-			var y3 = vertexY;
-			if(y3 == null) {
-				y3 = 0;
-			}
-			if(x3 == null) {
-				x3 = 0;
-			}
-			var value_x3 = x3;
-			var value_y3 = y3;
-			var value_z3 = 0;
-			var value_w3 = 1;
-			var pos_x3 = 0;
-			var pos_y3 = 0;
-			var pos_z3 = 0;
-			pos_x3 = _00 * value_x3 + _10 * value_y3 + _20 * value_z3 + _30 * value_w3;
-			pos_y3 = _01 * value_x3 + _11 * value_y3 + _21 * value_z3 + _31 * value_w3;
-			pos_z3 = _02 * value_x3 + _12 * value_y3 + _22 * value_z3 + _32 * value_w3;
-			var u3 = uvs[6];
-			var v3 = uvs[7];
-			var offsetPos3 = vertexBufferCounter;
-			buffer[offsetPos3++] = pos_x3 + this.offsetX * cameraScale;
-			buffer[offsetPos3++] = pos_y3 + this.offsetY * cameraScale;
-			buffer[offsetPos3++] = pos_z3;
-			buffer[offsetPos3++] = u3;
-			buffer[offsetPos3++] = v3;
-			buffer[offsetPos3++] = redMul;
-			buffer[offsetPos3++] = greenMul;
-			buffer[offsetPos3++] = blueMul;
-			buffer[offsetPos3++] = alphaMul;
-			buffer[offsetPos3++] = redAdd;
-			buffer[offsetPos3++] = greenAdd;
-			buffer[offsetPos3++] = blueAdd;
-			buffer[offsetPos3++] = alphaAdd;
-			vertexBufferCounter += 13;
-			painter.setVertexDataCounter(vertexBufferCounter);
-		} else if(this.alpha != 1) {
-			var painter1 = com_gEngine_GEngine.get_i().getAlphaPainter(this.blend);
-			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter1);
-			var buffer1 = painter1.getVertexBuffer();
-			var vertexBufferCounter1 = painter1.getVertexDataCounter();
 			var vertexIndex = 0;
 			var uvIndex = 0;
 			var _g = 0;
@@ -4353,37 +4507,49 @@ com_gEngine_display_Sprite.prototype = {
 				++_g;
 				vertexX = vertexs[vertexIndex++] - this.pivotX;
 				vertexY = vertexs[vertexIndex++] - this.pivotY;
-				var x4 = vertexX;
-				var y4 = vertexY;
-				if(y4 == null) {
-					y4 = 0;
+				var x = vertexX;
+				var y = vertexY;
+				if(y == null) {
+					y = 0;
 				}
-				if(x4 == null) {
-					x4 = 0;
+				if(x == null) {
+					x = 0;
 				}
-				var value_x4 = x4;
-				var value_y4 = y4;
-				var value_z4 = 0;
-				var value_w4 = 1;
-				var pos_x4 = 0;
-				var pos_y4 = 0;
-				var pos_z4 = 0;
-				pos_x4 = _00 * value_x4 + _10 * value_y4 + _20 * value_z4 + _30 * value_w4;
-				pos_y4 = _01 * value_x4 + _11 * value_y4 + _21 * value_z4 + _31 * value_w4;
-				pos_z4 = _02 * value_x4 + _12 * value_y4 + _22 * value_z4 + _32 * value_w4;
-				buffer1[vertexBufferCounter1++] = pos_x4 + this.offsetX * cameraScale;
-				buffer1[vertexBufferCounter1++] = pos_y4 + this.offsetY * cameraScale;
-				buffer1[vertexBufferCounter1++] = pos_z4;
-				buffer1[vertexBufferCounter1++] = uvs[uvIndex++];
-				buffer1[vertexBufferCounter1++] = uvs[uvIndex++];
-				buffer1[vertexBufferCounter1++] = this.alpha;
+				var value_x = x;
+				var value_y = y;
+				var value_z = 0;
+				var value_w = 1;
+				var pos_x = 0;
+				var pos_y = 0;
+				var pos_z = 0;
+				pos_x = _00 * value_x + _102 * value_y + _202 * value_z + _302 * value_w;
+				pos_y = _011 * value_x + _112 * value_y + _212 * value_z + _312 * value_w;
+				pos_z = _021 * value_x + _122 * value_y + _222 * value_z + _322 * value_w;
+				var u = uvs[uvIndex++];
+				var v = uvs[uvIndex++];
+				var offsetPos = vertexBufferCounter;
+				buffer[offsetPos++] = pos_x + this.offsetX * cameraScale;
+				buffer[offsetPos++] = pos_y + this.offsetY * cameraScale;
+				buffer[offsetPos++] = pos_z + this.offsetZ;
+				buffer[offsetPos++] = u;
+				buffer[offsetPos++] = v;
+				buffer[offsetPos++] = redMul;
+				buffer[offsetPos++] = greenMul;
+				buffer[offsetPos++] = blueMul;
+				buffer[offsetPos++] = alphaMul;
+				buffer[offsetPos++] = redAdd;
+				buffer[offsetPos++] = greenAdd;
+				buffer[offsetPos++] = blueAdd;
+				buffer[offsetPos++] = alphaAdd;
+				vertexBufferCounter += 13;
 			}
-			painter1.setVertexDataCounter(vertexBufferCounter1);
-		} else {
-			var painter2 = com_gEngine_GEngine.get_i().getSimplePainter(this.blend);
-			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter2);
-			var buffer2 = painter2.getVertexBuffer();
-			var vertexBufferCounter2 = painter2.getVertexDataCounter();
+			painter.setVertexDataCounter(vertexBufferCounter);
+		} else if(this.alpha != 1) {
+			var painter1 = com_gEngine_GEngine.get_i().getAlphaPainter(this.blend);
+			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter1);
+			painter1 = paintMode.currentPainter;
+			var buffer1 = painter1.getVertexBuffer();
+			var vertexBufferCounter1 = painter1.getVertexDataCounter();
 			var vertexIndex1 = 0;
 			var uvIndex1 = 0;
 			var _g1 = 0;
@@ -4391,29 +4557,68 @@ com_gEngine_display_Sprite.prototype = {
 				++_g1;
 				vertexX = vertexs[vertexIndex1++] - this.pivotX;
 				vertexY = vertexs[vertexIndex1++] - this.pivotY;
-				var x5 = vertexX;
-				var y5 = vertexY;
-				if(y5 == null) {
-					y5 = 0;
+				var x1 = vertexX;
+				var y1 = vertexY;
+				if(y1 == null) {
+					y1 = 0;
 				}
-				if(x5 == null) {
-					x5 = 0;
+				if(x1 == null) {
+					x1 = 0;
 				}
-				var value_x5 = x5;
-				var value_y5 = y5;
-				var value_z5 = 0;
-				var value_w5 = 1;
-				var pos_x5 = 0;
-				var pos_y5 = 0;
-				var pos_z5 = 0;
-				pos_x5 = _00 * value_x5 + _10 * value_y5 + _20 * value_z5 + _30 * value_w5;
-				pos_y5 = _01 * value_x5 + _11 * value_y5 + _21 * value_z5 + _31 * value_w5;
-				pos_z5 = _02 * value_x5 + _12 * value_y5 + _22 * value_z5 + _32 * value_w5;
-				buffer2[vertexBufferCounter2++] = pos_x5 + this.offsetX * cameraScale;
-				buffer2[vertexBufferCounter2++] = pos_y5 + this.offsetY * cameraScale;
-				buffer2[vertexBufferCounter2++] = pos_z5;
-				buffer2[vertexBufferCounter2++] = uvs[uvIndex1++];
-				buffer2[vertexBufferCounter2++] = uvs[uvIndex1++];
+				var value_x1 = x1;
+				var value_y1 = y1;
+				var value_z1 = 0;
+				var value_w1 = 1;
+				var pos_x1 = 0;
+				var pos_y1 = 0;
+				var pos_z1 = 0;
+				pos_x1 = _00 * value_x1 + _102 * value_y1 + _202 * value_z1 + _302 * value_w1;
+				pos_y1 = _011 * value_x1 + _112 * value_y1 + _212 * value_z1 + _312 * value_w1;
+				pos_z1 = _021 * value_x1 + _122 * value_y1 + _222 * value_z1 + _322 * value_w1;
+				buffer1[vertexBufferCounter1++] = pos_x1 + this.offsetX * cameraScale;
+				buffer1[vertexBufferCounter1++] = pos_y1 + this.offsetY * cameraScale;
+				buffer1[vertexBufferCounter1++] = pos_z1;
+				buffer1[vertexBufferCounter1++] = uvs[uvIndex1++];
+				buffer1[vertexBufferCounter1++] = uvs[uvIndex1++];
+				buffer1[vertexBufferCounter1++] = this.alpha;
+			}
+			painter1.setVertexDataCounter(vertexBufferCounter1);
+		} else {
+			var painter2 = com_gEngine_GEngine.get_i().getSimplePainter(this.blend);
+			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter2);
+			painter2 = paintMode.currentPainter;
+			var buffer2 = painter2.getVertexBuffer();
+			var vertexBufferCounter2 = painter2.getVertexDataCounter();
+			var vertexIndex2 = 0;
+			var uvIndex2 = 0;
+			var _g2 = 0;
+			while(_g2 < 4) {
+				++_g2;
+				vertexX = vertexs[vertexIndex2++] - this.pivotX;
+				vertexY = vertexs[vertexIndex2++] - this.pivotY;
+				var x2 = vertexX;
+				var y2 = vertexY;
+				if(y2 == null) {
+					y2 = 0;
+				}
+				if(x2 == null) {
+					x2 = 0;
+				}
+				var value_x2 = x2;
+				var value_y2 = y2;
+				var value_z2 = 0;
+				var value_w2 = 1;
+				var pos_x2 = 0;
+				var pos_y2 = 0;
+				var pos_z2 = 0;
+				pos_x2 = _00 * value_x2 + _102 * value_y2 + _202 * value_z2 + _302 * value_w2;
+				pos_y2 = _011 * value_x2 + _112 * value_y2 + _212 * value_z2 + _312 * value_w2;
+				pos_z2 = _021 * value_x2 + _122 * value_y2 + _222 * value_z2 + _322 * value_w2;
+				buffer2[vertexBufferCounter2++] = pos_x2 + this.offsetX * cameraScale;
+				buffer2[vertexBufferCounter2++] = pos_y2 + this.offsetY * cameraScale;
+				buffer2[vertexBufferCounter2++] = pos_z2;
+				buffer2[vertexBufferCounter2++] = uvs[uvIndex2++];
+				buffer2[vertexBufferCounter2++] = uvs[uvIndex2++];
 			}
 			painter2.setVertexDataCounter(vertexBufferCounter2);
 		}
@@ -4426,6 +4631,25 @@ com_gEngine_display_Sprite.prototype = {
 			this.parent.remove(this);
 			this.parent = null;
 		}
+	}
+	,colorAdd: function(r,g,b,a) {
+		if(a == null) {
+			a = 0;
+		}
+		if(b == null) {
+			b = 0;
+		}
+		if(g == null) {
+			g = 0;
+		}
+		if(r == null) {
+			r = 0;
+		}
+		this.addRed = r;
+		this.addGreen = g;
+		this.addBlue = b;
+		this.addAlpha = a;
+		this.colorTransform = !(this.mulRed == 1 && this.mulGreen == 1 && this.mulBlue == 1 && this.alpha == 1 && this.addRed == 0 && this.addGreen == 0 && this.addBlue == 0 && this.addAlpha == 0);
 	}
 	,colorMultiplication: function(r,g,b,a) {
 		if(a == null) {
@@ -4447,26 +4671,264 @@ com_gEngine_display_Sprite.prototype = {
 		this.colorTransform = !(this.mulRed == 1 && this.mulGreen == 1 && this.mulBlue == 1 && this.alpha == 1 && this.addRed == 0 && this.addGreen == 0 && this.addBlue == 0 && this.addAlpha == 0);
 	}
 	,getDrawArea: function(area,transform) {
+		var _this = this.transform;
+		var m__00 = 1;
+		var m__10 = 0;
+		var m__20 = 0;
+		var m__30 = 0;
+		var m__01 = 0;
+		var m__11 = 1;
+		var m__21 = 0;
+		var m__31 = 0;
+		var m__02 = 0;
+		var m__12 = 0;
+		var m__22 = 1;
+		var m__32 = 0;
+		var m__03 = 0;
+		var m__13 = 0;
+		var m__23 = 0;
+		var m__33 = 1;
+		_this._00 = m__00;
+		_this._10 = m__10;
+		_this._20 = m__20;
+		_this._30 = m__30;
+		_this._01 = m__01;
+		_this._11 = m__11;
+		_this._21 = m__21;
+		_this._31 = m__31;
+		_this._02 = m__02;
+		_this._12 = m__12;
+		_this._22 = m__22;
+		_this._32 = m__32;
+		_this._03 = m__03;
+		_this._13 = m__13;
+		_this._23 = m__23;
+		_this._33 = m__33;
 		this.transform._00 = this.cosAng * this.scaleX;
 		this.transform._10 = -this.sinAng * this.scaleY;
 		this.transform._30 = this.x + this.pivotX;
 		this.transform._01 = this.sinAng * this.scaleX;
 		this.transform._11 = this.cosAng * this.scaleY;
 		this.transform._31 = this.y + this.pivotY;
+		this.transform._22 = this.scaleZ;
 		this.transform._32 = this.z;
-		var m = this.transform;
-		var _00 = transform._00 * m._00 + transform._10 * m._01 + transform._20 * m._02 + transform._30 * m._03;
-		var _10 = transform._00 * m._10 + transform._10 * m._11 + transform._20 * m._12 + transform._30 * m._13;
-		var _20 = transform._00 * m._20 + transform._10 * m._21 + transform._20 * m._22 + transform._30 * m._23;
-		var _30 = transform._00 * m._30 + transform._10 * m._31 + transform._20 * m._32 + transform._30 * m._33;
-		var _01 = transform._01 * m._00 + transform._11 * m._01 + transform._21 * m._02 + transform._31 * m._03;
-		var _11 = transform._01 * m._10 + transform._11 * m._11 + transform._21 * m._12 + transform._31 * m._13;
-		var _21 = transform._01 * m._20 + transform._11 * m._21 + transform._21 * m._22 + transform._31 * m._23;
-		var _31 = transform._01 * m._30 + transform._11 * m._31 + transform._21 * m._32 + transform._31 * m._33;
-		var _02 = transform._02 * m._00 + transform._12 * m._01 + transform._22 * m._02 + transform._32 * m._03;
-		var _12 = transform._02 * m._10 + transform._12 * m._11 + transform._22 * m._12 + transform._32 * m._13;
-		var _22 = transform._02 * m._20 + transform._12 * m._21 + transform._22 * m._22 + transform._32 * m._23;
-		var _32 = transform._02 * m._30 + transform._12 * m._31 + transform._22 * m._32 + transform._32 * m._33;
+		if(this.billboard) {
+			var m3 = transform._12;
+			var m4 = transform._22;
+			var m5 = transform._32;
+			var m6 = transform._13;
+			var m7 = transform._23;
+			var m8 = transform._33;
+			var c00 = transform._11 * (m4 * m8 - m5 * m7) - transform._21 * (m3 * m8 - m5 * m6) + transform._31 * (m3 * m7 - m4 * m6);
+			var m31 = transform._12;
+			var m41 = transform._22;
+			var m51 = transform._32;
+			var m61 = transform._13;
+			var m71 = transform._23;
+			var m81 = transform._33;
+			var c01 = transform._10 * (m41 * m81 - m51 * m71) - transform._20 * (m31 * m81 - m51 * m61) + transform._30 * (m31 * m71 - m41 * m61);
+			var m32 = transform._11;
+			var m42 = transform._21;
+			var m52 = transform._31;
+			var m62 = transform._13;
+			var m72 = transform._23;
+			var m82 = transform._33;
+			var c02 = transform._10 * (m42 * m82 - m52 * m72) - transform._20 * (m32 * m82 - m52 * m62) + transform._30 * (m32 * m72 - m42 * m62);
+			var m33 = transform._11;
+			var m43 = transform._21;
+			var m53 = transform._31;
+			var m63 = transform._12;
+			var m73 = transform._22;
+			var m83 = transform._32;
+			var c03 = transform._10 * (m43 * m83 - m53 * m73) - transform._20 * (m33 * m83 - m53 * m63) + transform._30 * (m33 * m73 - m43 * m63);
+			var det = transform._00 * c00 - transform._01 * c01 + transform._02 * c02 - transform._03 * c03;
+			if(Math.abs(det) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var m34 = transform._02;
+			var m44 = transform._22;
+			var m54 = transform._32;
+			var m64 = transform._03;
+			var m74 = transform._23;
+			var m84 = transform._33;
+			var c10 = transform._01 * (m44 * m84 - m54 * m74) - transform._21 * (m34 * m84 - m54 * m64) + transform._31 * (m34 * m74 - m44 * m64);
+			var m35 = transform._02;
+			var m45 = transform._22;
+			var m55 = transform._32;
+			var m65 = transform._03;
+			var m75 = transform._23;
+			var m85 = transform._33;
+			var c11 = transform._00 * (m45 * m85 - m55 * m75) - transform._20 * (m35 * m85 - m55 * m65) + transform._30 * (m35 * m75 - m45 * m65);
+			var m36 = transform._01;
+			var m46 = transform._21;
+			var m56 = transform._31;
+			var m66 = transform._03;
+			var m76 = transform._23;
+			var m86 = transform._33;
+			var c12 = transform._00 * (m46 * m86 - m56 * m76) - transform._20 * (m36 * m86 - m56 * m66) + transform._30 * (m36 * m76 - m46 * m66);
+			var m37 = transform._01;
+			var m47 = transform._21;
+			var m57 = transform._31;
+			var m67 = transform._02;
+			var m77 = transform._22;
+			var m87 = transform._32;
+			var c13 = transform._00 * (m47 * m87 - m57 * m77) - transform._20 * (m37 * m87 - m57 * m67) + transform._30 * (m37 * m77 - m47 * m67);
+			var m38 = transform._02;
+			var m48 = transform._12;
+			var m58 = transform._32;
+			var m68 = transform._03;
+			var m78 = transform._13;
+			var m88 = transform._33;
+			var c20 = transform._01 * (m48 * m88 - m58 * m78) - transform._11 * (m38 * m88 - m58 * m68) + transform._31 * (m38 * m78 - m48 * m68);
+			var m39 = transform._02;
+			var m49 = transform._12;
+			var m59 = transform._32;
+			var m69 = transform._03;
+			var m79 = transform._13;
+			var m89 = transform._33;
+			var c21 = transform._00 * (m49 * m89 - m59 * m79) - transform._10 * (m39 * m89 - m59 * m69) + transform._30 * (m39 * m79 - m49 * m69);
+			var m310 = transform._01;
+			var m410 = transform._11;
+			var m510 = transform._31;
+			var m610 = transform._03;
+			var m710 = transform._13;
+			var m810 = transform._33;
+			var c22 = transform._00 * (m410 * m810 - m510 * m710) - transform._10 * (m310 * m810 - m510 * m610) + transform._30 * (m310 * m710 - m410 * m610);
+			var m311 = transform._01;
+			var m411 = transform._11;
+			var m511 = transform._31;
+			var m611 = transform._02;
+			var m711 = transform._12;
+			var m811 = transform._32;
+			var c23 = transform._00 * (m411 * m811 - m511 * m711) - transform._10 * (m311 * m811 - m511 * m611) + transform._30 * (m311 * m711 - m411 * m611);
+			var m312 = transform._02;
+			var m412 = transform._12;
+			var m512 = transform._22;
+			var m612 = transform._03;
+			var m712 = transform._13;
+			var m812 = transform._23;
+			var c30 = transform._01 * (m412 * m812 - m512 * m712) - transform._11 * (m312 * m812 - m512 * m612) + transform._21 * (m312 * m712 - m412 * m612);
+			var m313 = transform._02;
+			var m413 = transform._12;
+			var m513 = transform._22;
+			var m613 = transform._03;
+			var m713 = transform._13;
+			var m813 = transform._23;
+			var c31 = transform._00 * (m413 * m813 - m513 * m713) - transform._10 * (m313 * m813 - m513 * m613) + transform._20 * (m313 * m713 - m413 * m613);
+			var m314 = transform._01;
+			var m414 = transform._11;
+			var m514 = transform._21;
+			var m614 = transform._03;
+			var m714 = transform._13;
+			var m814 = transform._23;
+			var c32 = transform._00 * (m414 * m814 - m514 * m714) - transform._10 * (m314 * m814 - m514 * m614) + transform._20 * (m314 * m714 - m414 * m614);
+			var m315 = transform._01;
+			var m415 = transform._11;
+			var m515 = transform._21;
+			var m615 = transform._02;
+			var m715 = transform._12;
+			var m815 = transform._22;
+			var c33 = transform._00 * (m415 * m815 - m515 * m715) - transform._10 * (m315 * m815 - m515 * m615) + transform._20 * (m315 * m715 - m415 * m615);
+			var invdet = 1.0 / det;
+			var rotation__00 = c00 * invdet;
+			var rotation__10 = -c01 * invdet;
+			var rotation__20 = c02 * invdet;
+			var rotation__30 = -c03 * invdet;
+			var rotation__01 = -c10 * invdet;
+			var rotation__11 = c11 * invdet;
+			var rotation__21 = -c12 * invdet;
+			var rotation__31 = c13 * invdet;
+			var rotation__02 = c20 * invdet;
+			var rotation__12 = -c21 * invdet;
+			var rotation__22 = c22 * invdet;
+			var rotation__32 = -c23 * invdet;
+			var rotation__03 = -c30 * invdet;
+			var rotation__13 = c31 * invdet;
+			var rotation__23 = -c32 * invdet;
+			var rotation__33 = c33 * invdet;
+			rotation__32 = 0;
+			rotation__31 = rotation__32;
+			rotation__30 = rotation__31;
+			var _this1 = this.transform;
+			var _this2 = this.transform;
+			var _10 = _this2._00 * rotation__10 + _this2._10 * rotation__11 + _this2._20 * rotation__12 + _this2._30 * rotation__13;
+			var _20 = _this2._00 * rotation__20 + _this2._10 * rotation__21 + _this2._20 * rotation__22 + _this2._30 * rotation__23;
+			var _30 = _this2._00 * rotation__30 + _this2._10 * rotation__31 + _this2._20 * rotation__32 + _this2._30 * rotation__33;
+			var _11 = _this2._01 * rotation__10 + _this2._11 * rotation__11 + _this2._21 * rotation__12 + _this2._31 * rotation__13;
+			var _21 = _this2._01 * rotation__20 + _this2._11 * rotation__21 + _this2._21 * rotation__22 + _this2._31 * rotation__23;
+			var _31 = _this2._01 * rotation__30 + _this2._11 * rotation__31 + _this2._21 * rotation__32 + _this2._31 * rotation__33;
+			var _12 = _this2._02 * rotation__10 + _this2._12 * rotation__11 + _this2._22 * rotation__12 + _this2._32 * rotation__13;
+			var _22 = _this2._02 * rotation__20 + _this2._12 * rotation__21 + _this2._22 * rotation__22 + _this2._32 * rotation__23;
+			var _32 = _this2._02 * rotation__30 + _this2._12 * rotation__31 + _this2._22 * rotation__32 + _this2._32 * rotation__33;
+			var _13 = _this2._03 * rotation__10 + _this2._13 * rotation__11 + _this2._23 * rotation__12 + _this2._33 * rotation__13;
+			var _23 = _this2._03 * rotation__20 + _this2._13 * rotation__21 + _this2._23 * rotation__22 + _this2._33 * rotation__23;
+			var _33 = _this2._03 * rotation__30 + _this2._13 * rotation__31 + _this2._23 * rotation__32 + _this2._33 * rotation__33;
+			_this1._00 = _this2._00 * rotation__00 + _this2._10 * rotation__01 + _this2._20 * rotation__02 + _this2._30 * rotation__03;
+			_this1._10 = _10;
+			_this1._20 = _20;
+			_this1._30 = _30;
+			_this1._01 = _this2._01 * rotation__00 + _this2._11 * rotation__01 + _this2._21 * rotation__02 + _this2._31 * rotation__03;
+			_this1._11 = _11;
+			_this1._21 = _21;
+			_this1._31 = _31;
+			_this1._02 = _this2._02 * rotation__00 + _this2._12 * rotation__01 + _this2._22 * rotation__02 + _this2._32 * rotation__03;
+			_this1._12 = _12;
+			_this1._22 = _22;
+			_this1._32 = _32;
+			_this1._03 = _this2._03 * rotation__00 + _this2._13 * rotation__01 + _this2._23 * rotation__02 + _this2._33 * rotation__03;
+			_this1._13 = _13;
+			_this1._23 = _23;
+			_this1._33 = _33;
+		}
+		if(this.rotation3d != null) {
+			var _this3 = this.transform;
+			var _this4 = this.transform;
+			var m = this.rotation3d;
+			var _101 = _this4._00 * m._10 + _this4._10 * m._11 + _this4._20 * m._12 + _this4._30 * m._13;
+			var _201 = _this4._00 * m._20 + _this4._10 * m._21 + _this4._20 * m._22 + _this4._30 * m._23;
+			var _301 = _this4._00 * m._30 + _this4._10 * m._31 + _this4._20 * m._32 + _this4._30 * m._33;
+			var _01 = _this4._01 * m._00 + _this4._11 * m._01 + _this4._21 * m._02 + _this4._31 * m._03;
+			var _111 = _this4._01 * m._10 + _this4._11 * m._11 + _this4._21 * m._12 + _this4._31 * m._13;
+			var _211 = _this4._01 * m._20 + _this4._11 * m._21 + _this4._21 * m._22 + _this4._31 * m._23;
+			var _311 = _this4._01 * m._30 + _this4._11 * m._31 + _this4._21 * m._32 + _this4._31 * m._33;
+			var _02 = _this4._02 * m._00 + _this4._12 * m._01 + _this4._22 * m._02 + _this4._32 * m._03;
+			var _121 = _this4._02 * m._10 + _this4._12 * m._11 + _this4._22 * m._12 + _this4._32 * m._13;
+			var _221 = _this4._02 * m._20 + _this4._12 * m._21 + _this4._22 * m._22 + _this4._32 * m._23;
+			var _321 = _this4._02 * m._30 + _this4._12 * m._31 + _this4._22 * m._32 + _this4._32 * m._33;
+			var _03 = _this4._03 * m._00 + _this4._13 * m._01 + _this4._23 * m._02 + _this4._33 * m._03;
+			var _131 = _this4._03 * m._10 + _this4._13 * m._11 + _this4._23 * m._12 + _this4._33 * m._13;
+			var _231 = _this4._03 * m._20 + _this4._13 * m._21 + _this4._23 * m._22 + _this4._33 * m._23;
+			var _331 = _this4._03 * m._30 + _this4._13 * m._31 + _this4._23 * m._32 + _this4._33 * m._33;
+			_this3._00 = _this4._00 * m._00 + _this4._10 * m._01 + _this4._20 * m._02 + _this4._30 * m._03;
+			_this3._10 = _101;
+			_this3._20 = _201;
+			_this3._30 = _301;
+			_this3._01 = _01;
+			_this3._11 = _111;
+			_this3._21 = _211;
+			_this3._31 = _311;
+			_this3._02 = _02;
+			_this3._12 = _121;
+			_this3._22 = _221;
+			_this3._32 = _321;
+			_this3._03 = _03;
+			_this3._13 = _131;
+			_this3._23 = _231;
+			_this3._33 = _331;
+		}
+		var m1 = this.transform;
+		var _00 = transform._00 * m1._00 + transform._10 * m1._01 + transform._20 * m1._02 + transform._30 * m1._03;
+		var _102 = transform._00 * m1._10 + transform._10 * m1._11 + transform._20 * m1._12 + transform._30 * m1._13;
+		var _202 = transform._00 * m1._20 + transform._10 * m1._21 + transform._20 * m1._22 + transform._30 * m1._23;
+		var _302 = transform._00 * m1._30 + transform._10 * m1._31 + transform._20 * m1._32 + transform._30 * m1._33;
+		var _011 = transform._01 * m1._00 + transform._11 * m1._01 + transform._21 * m1._02 + transform._31 * m1._03;
+		var _112 = transform._01 * m1._10 + transform._11 * m1._11 + transform._21 * m1._12 + transform._31 * m1._13;
+		var _212 = transform._01 * m1._20 + transform._11 * m1._21 + transform._21 * m1._22 + transform._31 * m1._23;
+		var _312 = transform._01 * m1._30 + transform._11 * m1._31 + transform._21 * m1._32 + transform._31 * m1._33;
+		var _021 = transform._02 * m1._00 + transform._12 * m1._01 + transform._22 * m1._02 + transform._32 * m1._03;
+		var _122 = transform._02 * m1._10 + transform._12 * m1._11 + transform._22 * m1._12 + transform._32 * m1._13;
+		var _222 = transform._02 * m1._20 + transform._12 * m1._21 + transform._22 * m1._22 + transform._32 * m1._23;
+		var _322 = transform._02 * m1._30 + transform._12 * m1._31 + transform._22 * m1._32 + transform._32 * m1._33;
 		var drawArea = this.animationData.frames[this.timeline.currentFrame].drawArea;
 		if(drawArea.maxX != 16) {
 			drawArea.minX = drawArea.minX;
@@ -4486,9 +4948,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x = 0;
 		var multvec_y = 0;
 		var multvec_z = 0;
-		multvec_x = _00 * value_x + _10 * value_y + _20 * value_z + _30 * value_w;
-		multvec_y = _01 * value_x + _11 * value_y + _21 * value_z + _31 * value_w;
-		multvec_z = _02 * value_x + _12 * value_y + _22 * value_z + _32 * value_w;
+		multvec_x = _00 * value_x + _102 * value_y + _202 * value_z + _302 * value_w;
+		multvec_y = _011 * value_x + _112 * value_y + _212 * value_z + _312 * value_w;
+		multvec_z = _021 * value_x + _122 * value_y + _222 * value_z + _322 * value_w;
 		if(area.min.x > multvec_x) {
 			area.min.x = multvec_x;
 		}
@@ -4523,9 +4985,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x1 = 0;
 		var multvec_y1 = 0;
 		var multvec_z1 = 0;
-		multvec_x1 = _00 * value_x1 + _10 * value_y1 + _20 * value_z1 + _30 * value_w1;
-		multvec_y1 = _01 * value_x1 + _11 * value_y1 + _21 * value_z1 + _31 * value_w1;
-		multvec_z1 = _02 * value_x1 + _12 * value_y1 + _22 * value_z1 + _32 * value_w1;
+		multvec_x1 = _00 * value_x1 + _102 * value_y1 + _202 * value_z1 + _302 * value_w1;
+		multvec_y1 = _011 * value_x1 + _112 * value_y1 + _212 * value_z1 + _312 * value_w1;
+		multvec_z1 = _021 * value_x1 + _122 * value_y1 + _222 * value_z1 + _322 * value_w1;
 		if(area.min.x > multvec_x1) {
 			area.min.x = multvec_x1;
 		}
@@ -4560,9 +5022,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x2 = 0;
 		var multvec_y2 = 0;
 		var multvec_z2 = 0;
-		multvec_x2 = _00 * value_x2 + _10 * value_y2 + _20 * value_z2 + _30 * value_w2;
-		multvec_y2 = _01 * value_x2 + _11 * value_y2 + _21 * value_z2 + _31 * value_w2;
-		multvec_z2 = _02 * value_x2 + _12 * value_y2 + _22 * value_z2 + _32 * value_w2;
+		multvec_x2 = _00 * value_x2 + _102 * value_y2 + _202 * value_z2 + _302 * value_w2;
+		multvec_y2 = _011 * value_x2 + _112 * value_y2 + _212 * value_z2 + _312 * value_w2;
+		multvec_z2 = _021 * value_x2 + _122 * value_y2 + _222 * value_z2 + _322 * value_w2;
 		if(area.min.x > multvec_x2) {
 			area.min.x = multvec_x2;
 		}
@@ -4597,9 +5059,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x3 = 0;
 		var multvec_y3 = 0;
 		var multvec_z3 = 0;
-		multvec_x3 = _00 * value_x3 + _10 * value_y3 + _20 * value_z3 + _30 * value_w3;
-		multvec_y3 = _01 * value_x3 + _11 * value_y3 + _21 * value_z3 + _31 * value_w3;
-		multvec_z3 = _02 * value_x3 + _12 * value_y3 + _22 * value_z3 + _32 * value_w3;
+		multvec_x3 = _00 * value_x3 + _102 * value_y3 + _202 * value_z3 + _302 * value_w3;
+		multvec_y3 = _011 * value_x3 + _112 * value_y3 + _212 * value_z3 + _312 * value_w3;
+		multvec_z3 = _021 * value_x3 + _122 * value_y3 + _222 * value_z3 + _322 * value_w3;
 		if(area.min.x > multvec_x3) {
 			area.min.x = multvec_x3;
 		}
@@ -4713,6 +5175,55 @@ com_gEngine_display_Stage.prototype = {
 	}
 	,__class__: com_gEngine_display_Stage
 };
+var com_gEngine_display_StaticLayer = function() {
+	com_gEngine_display_Layer.call(this);
+	this.offset = new kha_math_FastMatrix4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
+};
+$hxClasses["com.gEngine.display.StaticLayer"] = com_gEngine_display_StaticLayer;
+com_gEngine_display_StaticLayer.__name__ = "com.gEngine.display.StaticLayer";
+com_gEngine_display_StaticLayer.__super__ = com_gEngine_display_Layer;
+com_gEngine_display_StaticLayer.prototype = $extend(com_gEngine_display_Layer.prototype,{
+	render: function(paintMode,transform) {
+		paintMode.render();
+		var proj = paintMode.camera.projection;
+		paintMode.camera.projection = paintMode.camera.orthogonal;
+		var _this = this.offset;
+		var m__00 = 1;
+		var m__10 = 0;
+		var m__20 = 0;
+		var m__01 = 0;
+		var m__11 = 1;
+		var m__21 = 0;
+		var m__02 = 0;
+		var m__12 = 0;
+		var m__22 = 1;
+		var m__32 = 0;
+		var m__03 = 0;
+		var m__13 = 0;
+		var m__23 = 0;
+		var m__33 = 1;
+		_this._00 = m__00;
+		_this._10 = m__10;
+		_this._20 = m__20;
+		_this._30 = -paintMode.camera.width * 0.5;
+		_this._01 = m__01;
+		_this._11 = m__11;
+		_this._21 = m__21;
+		_this._31 = -paintMode.camera.height * 0.5;
+		_this._02 = m__02;
+		_this._12 = m__12;
+		_this._22 = m__22;
+		_this._32 = m__32;
+		_this._03 = m__03;
+		_this._13 = m__13;
+		_this._23 = m__23;
+		_this._33 = m__33;
+		com_gEngine_display_Layer.prototype.render.call(this,paintMode,this.offset);
+		paintMode.render();
+		paintMode.camera.projection = proj;
+	}
+	,__class__: com_gEngine_display_StaticLayer
+});
 var com_gEngine_display_Text = function(type) {
 	this.bakedQuadCache = new kha_AlignedQuad();
 	this.sourceFontSize = 0;
@@ -4802,6 +5313,22 @@ com_gEngine_display_Text.prototype = $extend(com_gEngine_display_Layer.prototype
 	,getLetter: function(aId) {
 		return this.mLetters[aId];
 	}
+	,width: function() {
+		var min = Infinity;
+		var max = -Infinity;
+		var _g = 0;
+		var _g1 = this.mLetters;
+		while(_g < _g1.length) {
+			var letter = _g1[_g];
+			++_g;
+			if(letter.x < min) {
+				min = letter.x;
+			} else if(letter.x + letter.width() > max) {
+				max = letter.x + letter.width();
+			}
+		}
+		return max - min;
+	}
 	,set_color: function(color) {
 		var _g = 0;
 		var _g1 = this.mLetters;
@@ -4822,12 +5349,16 @@ var com_gEngine_display_extra_TileMapDisplay = function(tileType,widthInTiles,he
 	this.tileWidth = tileWidth;
 	this.tileHeight = tileHeight;
 	this.tiles = [];
+	this.orientation = [];
 	this.tile = tileType;
+	this.tile.pivotX = tileWidth * 0.5;
+	this.tile.pivotY = tileHeight * 0.5;
 	var _g = 0;
 	var _g1 = widthInTiles * heightInTiles;
 	while(_g < _g1) {
 		++_g;
 		this.tiles.push(-1);
+		this.orientation.push(0);
 	}
 };
 $hxClasses["com.gEngine.display.extra.TileMapDisplay"] = com_gEngine_display_extra_TileMapDisplay;
@@ -4837,11 +5368,40 @@ com_gEngine_display_extra_TileMapDisplay.prototype = $extend(com_gEngine_display
 	getTile: function(indexX,indexY) {
 		return this.tiles[indexX + this.widthInTiles * indexY];
 	}
-	,setTile: function(indexX,indexY,value) {
-		this.setTile2(indexX + this.widthInTiles * indexY,value);
+	,setTile: function(indexX,indexY,value,flipX,flipY,rotate) {
+		if(rotate == null) {
+			rotate = false;
+		}
+		if(flipY == null) {
+			flipY = false;
+		}
+		if(flipX == null) {
+			flipX = false;
+		}
+		this.setTile2(indexX + this.widthInTiles * indexY,value,flipX,flipY);
 	}
-	,setTile2: function(index,value) {
+	,setTile2: function(index,value,flipX,flipY,rotate) {
+		if(rotate == null) {
+			rotate = false;
+		}
+		if(flipY == null) {
+			flipY = false;
+		}
+		if(flipX == null) {
+			flipX = false;
+		}
 		this.tiles[index] = value;
+		var tileOrientation = 0;
+		if(flipX) {
+			tileOrientation = 1;
+		}
+		if(flipY) {
+			tileOrientation |= 2;
+		}
+		if(rotate) {
+			tileOrientation |= 4;
+		}
+		this.orientation[index] = tileOrientation;
 	}
 	,render: function(paintMode,transform) {
 		com_gEngine_display_Layer.prototype.render.call(this,paintMode,transform);
@@ -6038,10 +6598,20 @@ com_gEngine_display_extra_TileMapDisplay.prototype = $extend(com_gEngine_display
 				var index = x25 + this.widthInTiles * y25;
 				if(index >= 0 && index < this.tiles.length) {
 					var frame = this.tiles[index];
+					var orientation = this.orientation[index];
 					if(frame >= 0) {
 						this.tile.timeline.gotoAndStop(frame);
 						this.tile.x = x25 * this.tileWidth;
 						this.tile.y = y25 * this.tileHeight;
+						if((orientation & 4) != 0) {
+							this.tile.set_rotation(Math.PI * 0.5);
+							this.tile.scaleX = (orientation & 2) != 0 ? -1 : 1;
+							this.tile.scaleY = (orientation & 1) != 0 ? 1 : -1;
+						} else {
+							this.tile.set_rotation(0);
+							this.tile.scaleX = (orientation & 1) != 0 ? -1 : 1;
+							this.tile.scaleY = (orientation & 2) != 0 ? -1 : 1;
+						}
 						this.tile.render(paintMode,transform);
 					}
 				}
@@ -6068,7 +6638,10 @@ com_gEngine_helper_RectangleDisplay.init = function(textureID) {
 };
 com_gEngine_helper_RectangleDisplay.__super__ = com_gEngine_display_Sprite;
 com_gEngine_helper_RectangleDisplay.prototype = $extend(com_gEngine_display_Sprite.prototype,{
-	__class__: com_gEngine_helper_RectangleDisplay
+	setColor: function(r,g,b) {
+		this.colorMultiplication(r / 255,g / 255,b / 255,1);
+	}
+	,__class__: com_gEngine_helper_RectangleDisplay
 });
 var com_gEngine_helper_Timeline = function(frameRate,totalFrames,labels) {
 	this.currentTime = 0;
@@ -6079,7 +6652,8 @@ var com_gEngine_helper_Timeline = function(frameRate,totalFrames,labels) {
 	this.currentFrame = 0;
 	this.frameSkiped = 0;
 	this.frameRate = frameRate;
-	this.lastFrame = this.totalFrames = totalFrames;
+	this.lastFrame = totalFrames - 1;
+	this.totalFrames = totalFrames;
 	if(totalFrames == 1) {
 		this.playing = false;
 	}
@@ -6372,7 +6946,8 @@ var com_gEngine_painters_Painter = function(autoDestroy,blend,depthWrite,clockWi
 	this.depthWrite = depthWrite;
 	this.clockWise = clockWise;
 	this.initShaders(blend);
-	this.buffer = this.vertexBuffer.lock();
+	this.createBuffers();
+	this.buffer = this.downloadVertexBuffer();
 };
 $hxClasses["com.gEngine.painters.Painter"] = com_gEngine_painters_Painter;
 com_gEngine_painters_Painter.__name__ = "com.gEngine.painters.Painter";
@@ -6393,7 +6968,7 @@ com_gEngine_painters_Painter.prototype = {
 		this.canvasWidth = canvas.get_width();
 		this.canvasHeight = canvas.get_height();
 		var g = canvas.get_g4();
-		this.vertexBuffer.unlock(vertexCount);
+		this.uploadVertexBuffer(vertexCount);
 		if(clear) {
 			g.clear(kha__$Color_Color_$Impl_$.fromFloats(this.red,this.green,this.blue,this.alpha),1);
 		}
@@ -6404,7 +6979,7 @@ com_gEngine_painters_Painter.prototype = {
 		g.setTextureParameters(this.textureConstantID,2,2,this.filter,this.filter,this.mipMapFilter);
 		g.drawIndexedVertices(0,vertexCount * 1.5 | 0);
 		this.unsetTextures(g);
-		this.buffer = this.vertexBuffer.lock();
+		this.buffer = this.downloadVertexBuffer();
 		++com_gEngine_GEngine.drawCount;
 		this.counter = 0;
 	}
@@ -6413,13 +6988,13 @@ com_gEngine_painters_Painter.prototype = {
 	}
 	,initShaders: function(blend) {
 		this.pipeline = new kha_graphics4_PipelineState();
-		this.setShaders(this.pipeline);
-		var structure = new kha_graphics4_VertexStructure();
-		this.defineVertexStructure(structure);
-		this.pipeline.inputLayout = [structure];
+		this.structure = new kha_graphics4_VertexStructure();
+		this.defineVertexStructure(this.structure);
+		this.pipeline.inputLayout = [this.structure];
 		this.pipeline.depthMode = 4;
 		this.pipeline.cullMode = this.clockWise;
 		this.pipeline.depthWrite = this.depthWrite;
+		this.setShaders(this.pipeline);
 		var pipeline = this.pipeline;
 		pipeline.blendOperation = blend.blendOperation;
 		pipeline.blendSource = blend.blendSource;
@@ -6428,14 +7003,13 @@ com_gEngine_painters_Painter.prototype = {
 		pipeline.alphaBlendDestination = blend.alphaBlendDestination;
 		this.pipeline.compile();
 		this.getConstantLocations(this.pipeline);
-		this.vertexBuffer = new kha_graphics4_VertexBuffer(4000,structure,1);
-		this.createIndexBuffer();
 	}
 	,getConstantLocations: function(pipeline) {
 		this.mvpID = pipeline.getConstantLocation("projectionMatrix");
 		this.textureConstantID = pipeline.getTextureUnit("tex");
 	}
-	,createIndexBuffer: function() {
+	,createBuffers: function() {
+		this.vertexBuffer = new kha_graphics4_VertexBuffer(4000,this.structure,1);
 		this.indexBuffer = new kha_graphics4_IndexBuffer(6000,0);
 		var iData = this.indexBuffer.lock();
 		var _g = 0;
@@ -6464,6 +7038,12 @@ com_gEngine_painters_Painter.prototype = {
 	}
 	,unsetTextures: function(g) {
 		g.setTexture(this.textureConstantID,null);
+	}
+	,downloadVertexBuffer: function() {
+		return this.vertexBuffer.lock();
+	}
+	,uploadVertexBuffer: function(count) {
+		this.vertexBuffer.unlock(count);
 	}
 	,destroy: function() {
 		this.vertexBuffer.delete();
@@ -6517,11 +7097,14 @@ com_gEngine_painters_PainterAlpha.prototype = $extend(com_gEngine_painters_Paint
 	}
 	,__class__: com_gEngine_painters_PainterAlpha
 });
-var com_gEngine_painters_PainterColorTransform = function(autoDestroy,blend) {
+var com_gEngine_painters_PainterColorTransform = function(autoDestroy,blend,depthWrite) {
+	if(depthWrite == null) {
+		depthWrite = false;
+	}
 	if(autoDestroy == null) {
 		autoDestroy = true;
 	}
-	com_gEngine_painters_Painter.call(this,autoDestroy,blend);
+	com_gEngine_painters_Painter.call(this,autoDestroy,blend,depthWrite);
 	this.dataPerVertex = 13;
 };
 $hxClasses["com.gEngine.painters.PainterColorTransform"] = com_gEngine_painters_PainterColorTransform;
@@ -6824,6 +7407,9 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 	if(separation == null) {
 		separation = 2;
 	}
+	if(com_imageAtlas_AtlasGenerator.clearPipeline == null) {
+		com_imageAtlas_AtlasGenerator.clearPipeline = com_imageAtlas_AtlasGenerator.createClearPipeline();
+	}
 	bitmaps.sort(com_imageAtlas_AtlasGenerator.sortArea);
 	var atlasImage = kha_Image.createRenderTarget(width,height,0,0,0);
 	var realWidth = atlasImage.get_realWidth();
@@ -6843,13 +7429,22 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 			g.end();
 			g.begin(false);
 		}
-		g.set_pipeline(bitmap.specialPipeline);
+		if(bitmap.specialPipeline != null) {
+			g.set_pipeline(bitmap.specialPipeline);
+		} else {
+			g.set_pipeline(com_imageAtlas_AtlasGenerator.clearPipeline);
+		}
 		g.set_imageScaleQuality(1);
 		if(bitmap.hasMipMap) {
 			g.set_mipmapScaleQuality(1);
 		} else {
 			g.set_mipmapScaleQuality(0);
 		}
+		g.set_imageScaleQuality(0);
+		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x - 1,rectangle.y,bitmap.width + 2,bitmap.height);
+		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x,rectangle.y - 1,bitmap.width,bitmap.height + 2);
+		g.set_color(kha__$Color_Color_$Impl_$.fromFloats(1,1,1,1));
+		g.set_imageScaleQuality(1);
 		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x,rectangle.y,bitmap.width,bitmap.height);
 		rectangle.x += bitmap.extrude;
 		rectangle.y += bitmap.extrude;
@@ -6886,6 +7481,15 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 };
 com_imageAtlas_AtlasGenerator.sortArea = function(b1,b2) {
 	return b2.width * b2.height - b1.width * b1.height | 0;
+};
+com_imageAtlas_AtlasGenerator.createClearPipeline = function() {
+	var shaderPipeline = kha_graphics4_Graphics2.createImagePipeline(kha_graphics4_Graphics2.createImageVertexStructure());
+	shaderPipeline.blendSource = 1;
+	shaderPipeline.blendDestination = 2;
+	shaderPipeline.alphaBlendSource = 1;
+	shaderPipeline.alphaBlendDestination = 2;
+	shaderPipeline.compile();
+	return shaderPipeline;
 };
 var com_imageAtlas_Bitmap = function() {
 	this.hasPreRender = false;
@@ -7225,7 +7829,7 @@ com_loading_basicResources_FontLoader.prototype = $extend(com_loading_basicResou
 		kha_Assets.loadFont(this.imageName,function(font) {
 			_gthis.fromKhaFont();
 			callback();
-		},null,{ fileName : "com/loading/basicResources/FontLoader.hx", lineNumber : 28, className : "com.loading.basicResources.FontLoader", methodName : "load"});
+		},null,{ fileName : "com/loading/basicResources/FontLoader.hx", lineNumber : 29, className : "com.loading.basicResources.FontLoader", methodName : "load"});
 	}
 	,loadLocal: function(callback) {
 		this.fromKhaFont();
@@ -7243,6 +7847,10 @@ com_loading_basicResources_FontLoader.prototype = $extend(com_loading_basicResou
 		var counter = 0;
 		if(com_loading_basicResources_FontLoader.pipeline == null) {
 			com_loading_basicResources_FontLoader.pipeline = kha_graphics4_Graphics2.createTextPipeline(kha_graphics4_Graphics2.createTextVertexStructure());
+			com_loading_basicResources_FontLoader.pipeline.blendSource = 3;
+			com_loading_basicResources_FontLoader.pipeline.blendDestination = 2;
+			com_loading_basicResources_FontLoader.pipeline.alphaBlendSource = 3;
+			com_loading_basicResources_FontLoader.pipeline.alphaBlendDestination = 2;
 			com_loading_basicResources_FontLoader.pipeline.compile();
 		}
 		while(true) {
@@ -7383,136 +7991,6 @@ com_loading_basicResources_JoinAtlas.prototype = {
 	}
 	,__class__: com_loading_basicResources_JoinAtlas
 };
-var com_loading_basicResources_SparrowLoader = function(imageName,dataName) {
-	com_loading_basicResources_TilesheetLoader.call(this,imageName,0,0,0);
-	this.dataName = dataName;
-};
-$hxClasses["com.loading.basicResources.SparrowLoader"] = com_loading_basicResources_SparrowLoader;
-com_loading_basicResources_SparrowLoader.__name__ = "com.loading.basicResources.SparrowLoader";
-com_loading_basicResources_SparrowLoader.getBaseName = function(fullName) {
-	var foundInt = false;
-	var counter = fullName.length - 1;
-	while(counter >= 0) {
-		if(Std.parseInt(fullName.charAt(counter)) != null) {
-			fullName = fullName.substring(0,counter) + fullName.substring(counter + 1);
-			foundInt = true;
-		} else if(foundInt) {
-			break;
-		}
-		--counter;
-	}
-	return fullName;
-};
-com_loading_basicResources_SparrowLoader.__super__ = com_loading_basicResources_TilesheetLoader;
-com_loading_basicResources_SparrowLoader.prototype = $extend(com_loading_basicResources_TilesheetLoader.prototype,{
-	load: function(callback) {
-		var _gthis = this;
-		kha_Assets.loadImage(this.imageName,function(image) {
-			kha_Assets.loadBlob(_gthis.dataName,function(b) {
-				_gthis.fromSpriteSheet();
-				callback();
-			},null,{ fileName : "com/loading/basicResources/SparrowLoader.hx", lineNumber : 23, className : "com.loading.basicResources.SparrowLoader", methodName : "load"});
-		},null,{ fileName : "com/loading/basicResources/SparrowLoader.hx", lineNumber : 22, className : "com.loading.basicResources.SparrowLoader", methodName : "load"});
-	}
-	,fromSpriteSheet: function() {
-		var text = Reflect.field(kha_Assets.blobs,this.dataName);
-		var x = Xml.parse(text.toString()).firstElement();
-		if(x.nodeType != Xml.Document && x.nodeType != Xml.Element) {
-			throw new js__$Boot_HaxeError("Invalid nodeType " + _$Xml_XmlType_$Impl_$.toString(x.nodeType));
-		}
-		var data = x;
-		var image = Reflect.field(kha_Assets.images,this.imageName);
-		this.animation = new com_gEngine_AnimationData();
-		var frames = [];
-		var labels = [];
-		this.bitmaps = [];
-		var counter = 0;
-		var currentAnimation = null;
-		var textures = haxe_xml__$Access_NodeListAccess_$Impl_$.resolve(data,"SubTexture");
-		textures.sort(function(a,b) {
-			var aName = haxe_xml__$Access_AttribAccess_$Impl_$.resolve(a,"name");
-			var aNumber = "";
-			var aString = "";
-			var _g = 0;
-			var _g1 = text.get_length();
-			while(_g < _g1) {
-				var char = _g++;
-				if(Std.parseInt(aName.charAt(char)) != null) {
-					aNumber += aName.charAt(char);
-				} else {
-					aString += aName.charAt(char);
-				}
-			}
-			var bName = haxe_xml__$Access_AttribAccess_$Impl_$.resolve(b,"name");
-			var bNumber = "";
-			var bString = "";
-			var _g2 = 0;
-			var _g3 = text.get_length();
-			while(_g2 < _g3) {
-				var char1 = _g2++;
-				if(Std.parseInt(bName.charAt(char1)) != null) {
-					bNumber += bName.charAt(char1);
-				} else {
-					bString += bName.charAt(char1);
-				}
-			}
-			var aInt = Std.parseInt(aNumber);
-			var bInt = Std.parseInt(bNumber);
-			if(aString == bString) {
-				if(aInt < bInt) {
-					return -1;
-				}
-				if(aInt > bInt) {
-					return 1;
-				}
-			}
-			if(aString < bString) {
-				return -1;
-			}
-			if(aString > bString) {
-				return 1;
-			}
-			return 0;
-		});
-		var _g4 = 0;
-		while(_g4 < textures.length) {
-			var texture = textures[_g4];
-			++_g4;
-			var name = haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"name");
-			var trimmed = haxe_xml__$Access_HasAttribAccess_$Impl_$.resolve(texture,"frameX");
-			var rotated = haxe_xml__$Access_HasAttribAccess_$Impl_$.resolve(texture,"rotated") && haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"rotated") == "true";
-			if(haxe_xml__$Access_HasAttribAccess_$Impl_$.resolve(texture,"flipX")) {
-				haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"flipX");
-			}
-			if(haxe_xml__$Access_HasAttribAccess_$Impl_$.resolve(texture,"flipY")) {
-				haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"flipY");
-			}
-			var baseName = com_loading_basicResources_SparrowLoader.getBaseName(name);
-			if(currentAnimation != baseName) {
-				currentAnimation = baseName;
-				var label = new com_gEngine_Label(baseName,counter);
-				labels.push(label);
-			}
-			++counter;
-			var frameX = trimmed ? -Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"frameX")) : 0;
-			var frameY = trimmed ? -Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"frameY")) : 0;
-			frames.push(com_loading_basicResources_TilesheetLoader.createFrame(frameX,frameY,Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"width")),Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"height")),rotated));
-			var bitmap = new com_imageAtlas_Bitmap();
-			bitmap.x = Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"x"));
-			bitmap.y = Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"y"));
-			bitmap.width = Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"width"));
-			bitmap.height = Std.parseInt(haxe_xml__$Access_AttribAccess_$Impl_$.resolve(texture,"height"));
-			bitmap.name = name;
-			bitmap.image = image;
-			this.bitmaps.push(bitmap);
-		}
-		this.animation.frames = frames;
-		this.animation.name = this.imageName;
-		this.animation.labels = labels;
-		com_basicDisplay_SpriteSheetDB.get_i().add(this.animation);
-	}
-	,__class__: com_loading_basicResources_SparrowLoader
-});
 var com_loading_basicResources_SpriteSheetLoader = function(imageName,tileWidth,tileHeight,spacing,animations) {
 	com_loading_basicResources_TilesheetLoader.call(this,imageName,tileWidth,tileHeight,spacing);
 	this.animations = animations;
@@ -8697,12 +9175,177 @@ format_tmx_Tools.applyObjectTypeTemplate = function(obj,ot) {
 		}
 	}
 };
-var gameObjects_ChivitoBoy = function(x,y,layer) {
-	this.maxSpeed = 200;
+var gameObjects_Effect = function(player) {
+	this.isAcumulative = true;
 	com_framework_utils_Entity.call(this);
+	this.player = player;
+	player.addEffect(this);
+};
+$hxClasses["gameObjects.Effect"] = gameObjects_Effect;
+gameObjects_Effect.__name__ = "gameObjects.Effect";
+gameObjects_Effect.__super__ = com_framework_utils_Entity;
+gameObjects_Effect.prototype = $extend(com_framework_utils_Entity.prototype,{
+	effect: function(dt) {
+	}
+	,__class__: gameObjects_Effect
+});
+var gameObjects_EndGate = function(layer,collisions,x,y) {
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Sprite("gate");
+	this.display.timeline.playAnimation("idle");
+	this.display.colorAdd(0.75,0,0,0);
+	this.display.colorMultiplication(0,0.6,0.6,1);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collisionGroup = collisions;
+	this.collision.userData = this;
+	var tmp = this.display.width();
+	this.collision.width = tmp * 0.5;
+	this.collision.height = this.display.height();
+	collisions.add(this.collision);
+	this.display.x = this.collision.x = x;
+	this.display.y = this.collision.y = y;
+	this.display.offsetX = -this.display.width() * 0.25;
+	layer.addChild(this.display);
+};
+$hxClasses["gameObjects.EndGate"] = gameObjects_EndGate;
+gameObjects_EndGate.__name__ = "gameObjects.EndGate";
+gameObjects_EndGate.__super__ = com_framework_utils_Entity;
+gameObjects_EndGate.prototype = $extend(com_framework_utils_Entity.prototype,{
+	__class__: gameObjects_EndGate
+});
+var gameObjects_EnemyMinion = function(layer,collisions,x,y) {
+	this.lastDamageReceived = 0;
+	this.disapearTime = 2;
+	this.dyingTime = 0;
+	this.timeCounter = 0;
+	this.stunnedTime = 0.5;
+	this.stunned = false;
+	this.scorePoints = 0;
+	this.agressionRange = 200;
+	com_framework_utils_Entity.call(this);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collision.userData = this;
+	this.collisionGroup = collisions;
+	this.collision.x = x;
+	this.collision.y = y;
+	collisions.add(this.collision);
+	this.target = GlobalGameData.player;
+};
+$hxClasses["gameObjects.EnemyMinion"] = gameObjects_EnemyMinion;
+gameObjects_EnemyMinion.__name__ = "gameObjects.EnemyMinion";
+gameObjects_EnemyMinion.__super__ = com_framework_utils_Entity;
+gameObjects_EnemyMinion.prototype = $extend(com_framework_utils_Entity.prototype,{
+	get_x: function() {
+		return this.collision.x + this.collision.width * 0.5;
+	}
+	,get_y: function() {
+		return this.collision.y + this.collision.height;
+	}
+	,get_hitDamage: function() {
+		return this.hitDamage;
+	}
+	,addPoints: function() {
+		GlobalGameData.score += this.scorePoints;
+	}
+	,update: function(dt) {
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		this.collision.update(dt);
+		if(this.display.timeline.currentAnimation == "die") {
+			this.dyingTime += dt;
+			if(this.dyingTime <= this.disapearTime) {
+				this.display.colorMultiplication(1,1,1,1 - this.dyingTime / this.disapearTime);
+			} else {
+				this.display.removeFromParent();
+				this.die();
+			}
+			return;
+		}
+		if(this.stunned && this.timeCounter <= this.stunnedTime) {
+			this.display.colorMultiplication(1,1,1,0.5);
+			this.hitDamage = 0;
+			this.timeCounter += dt;
+			return;
+		} else if(this.stunned && this.timeCounter >= this.stunnedTime) {
+			this.stunned = false;
+			this.lastDamageReceived = 0;
+			this.hitDamage = 10;
+			this.display.colorMultiplication(1,1,1,1);
+			this.timeCounter = 0;
+		}
+		if(Math.abs(this.target.get_x() - this.collision.x) < this.agressionRange && Math.abs(this.target.get_y() - this.collision.y) < this.agressionRange) {
+			this.aggresiveStance(dt);
+		} else {
+			this.passiveStance(dt);
+		}
+	}
+	,aggresiveStance: function(dt) {
+	}
+	,passiveStance: function(dt) {
+	}
+	,damage: function(damageReceived) {
+		if(damageReceived == 0) {
+			return;
+		}
+		if(this.lastDamageReceived != damageReceived) {
+			this.currentHp -= damageReceived;
+			if(this.currentHp <= 0) {
+				this.addPoints();
+				this.display.timeline.playAnimation("die",false);
+				this.collision.velocityX = this.collision.velocityY = 0;
+				this.collision.accelerationY = this.collision.accelerationX = 0;
+				this.collision.removeFromParent();
+			} else {
+				this.display.timeline.playAnimation("hurt",false);
+				this.stunned = true;
+				this.timeCounter = 0;
+			}
+			this.lastDamageReceived = damageReceived;
+		}
+	}
+	,__class__: gameObjects_EnemyMinion
+});
+var gameObjects_Gate = function(layer,collisions,x,y,destinyX,destinyY) {
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Sprite("gate");
+	this.display.timeline.playAnimation("idle");
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collisionGroup = collisions;
+	this.collision.userData = this;
+	var tmp = this.display.width();
+	this.collision.width = tmp * 0.5;
+	this.collision.height = this.display.height();
+	collisions.add(this.collision);
+	this.display.x = this.collision.x = x;
+	this.display.y = this.collision.y = y;
+	this.display.offsetX = -this.display.width() * 0.25;
+	this.destinyX = destinyX;
+	this.destinyY = destinyY;
+	layer.addChild(this.display);
+};
+$hxClasses["gameObjects.Gate"] = gameObjects_Gate;
+gameObjects_Gate.__name__ = "gameObjects.Gate";
+gameObjects_Gate.__super__ = com_framework_utils_Entity;
+gameObjects_Gate.prototype = $extend(com_framework_utils_Entity.prototype,{
+	__class__: gameObjects_Gate
+});
+var gameObjects_Player = function(x,y,layer) {
+	this.hitDamage = 0;
+	this.maxHp = 200;
+	this.currentHp = 200;
+	this.maxSpeed = 200;
+	this.isReapiring = false;
+	this.isTransporting = false;
+	this.timeCounter = 0;
+	this.invulerableTime = 0;
+	this.isDying = false;
+	this.receiveHeavyDamage = false;
+	this.receiveLowDamage = false;
+	this.invulerable = false;
+	com_framework_utils_Entity.call(this);
+	this.effects = new haxe_ds_List();
 	this.display = new com_gEngine_display_Sprite("hero");
 	this.display.set_smooth(false);
-	layer.addChild(this.display);
+	GlobalGameData.simulationLayer.addChild(this.display);
 	this.collision = new com_collision_platformer_CollisionBox();
 	var tmp = this.display.width();
 	this.collision.width = tmp * 0.5;
@@ -8711,172 +9354,372 @@ var gameObjects_ChivitoBoy = function(x,y,layer) {
 	this.display.offsetY = -this.display.height() * 0.25;
 	var tmp2 = this.display.width();
 	this.display.pivotX = tmp2 * 0.25;
-	this.hitCollision = new com_collision_platformer_CollisionBox();
 	this.display.scaleX = this.display.scaleY = 1;
 	this.collision.x = x;
 	this.collision.y = y;
 	this.collision.userData = this;
-	this.collision.accelerationY = 2000;
+	this.collision.accelerationY = GlobalGameData.gravity;
 	this.collision.maxVelocityX = 500;
 	this.collision.maxVelocityY = 800;
 	this.collision.dragX = 0.9;
 };
-$hxClasses["gameObjects.ChivitoBoy"] = gameObjects_ChivitoBoy;
-gameObjects_ChivitoBoy.__name__ = "gameObjects.ChivitoBoy";
-gameObjects_ChivitoBoy.__super__ = com_framework_utils_Entity;
-gameObjects_ChivitoBoy.prototype = $extend(com_framework_utils_Entity.prototype,{
-	update: function(dt) {
-		com_framework_utils_Entity.prototype.update.call(this,dt);
-		this.collision.update(dt);
-		this.hitCollision.update(dt);
-		if(this.hitCollision.width > 0) {
-			this.hitCollision.x = this.collision.x + this.display.scaleX * this.collision.width * 0.5 + this.collision.width * 0.5 + (this.display.scaleX * this.hitCollision.width * 0.5 - this.hitCollision.width * 0.5);
-		} else {
-			this.hitCollision.x = this.collision.x + this.collision.width * 0.5;
-		}
-		this.hitCollision.y = this.collision.y + 5;
-		var tmp;
-		if(this.display.timeline.currentAnimation == "attack1") {
-			var _this = this.display.timeline;
-			tmp = !(!_this.playing && !_this.loop);
-		} else {
-			tmp = false;
-		}
-		if(tmp) {
-			this.hitCollision.width = 23;
-			this.hitCollision.height = this.collision.height * 0.5;
-		}
-		if(this.display.timeline.currentFrame == 8) {
-			this.collision.velocityX = this.display.scaleX * 1000;
-			this.hitCollision.width = 30;
-			this.hitCollision.height = this.collision.height * 0.5;
-		}
-		if(this.keepCombo && this.display.timeline.currentFrame == 13) {
-			this.keepCombo = false;
-			this.collision.velocityY = -200;
-			this.collision.velocityX = this.display.scaleX * 500;
-			this.hitCollision.width = 28;
-			this.hitCollision.height = this.collision.height;
-		}
-		if(this.isAirAtacking && this.display.timeline.currentFrame == 13) {
-			this.isAirAtacking = false;
-			this.hitCollision.width = 28;
-			this.hitCollision.height = this.collision.height;
-		}
-		if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
-			this.hitCollision.width = this.hitCollision.height = 0;
-			this.hitCollision.removeFromParent();
+$hxClasses["gameObjects.Player"] = gameObjects_Player;
+gameObjects_Player.__name__ = "gameObjects.Player";
+gameObjects_Player.__super__ = com_framework_utils_Entity;
+gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
+	get_x: function() {
+		return this.collision.x + this.collision.width * 0.5;
+	}
+	,get_y: function() {
+		return this.collision.y + this.collision.height;
+	}
+	,transport: function(newX,newY) {
+		if(!this.isTransporting) {
+			this.isTransporting = true;
+			this.invulerable = true;
+			this.destinyX = newX;
+			this.destinyY = newY;
+			this.invulerableTime = 1;
+			this.timeCounter = 0;
 		}
 	}
-	,render: function() {
-		this.display.x = this.collision.x;
-		this.display.y = this.collision.y;
-		var s = Math.abs(this.collision.velocityX / this.collision.maxVelocityX);
-		if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
-			this.display.timeline.frameRate = 0.0333333333333333329 * s + (1 - s) * 0.1;
+	,respawn: function(x,y,layer) {
+		this.x = x;
+		this.y = y;
+		this.display = new com_gEngine_display_Sprite("hero");
+		this.display.set_smooth(false);
+		GlobalGameData.simulationLayer.addChild(this.display);
+		this.collision = new com_collision_platformer_CollisionBox();
+		var tmp = this.display.width();
+		this.collision.width = tmp * 0.5;
+		var tmp1 = this.display.height();
+		this.collision.height = tmp1 * 0.75;
+		this.display.offsetY = -this.display.height() * 0.25;
+		var tmp2 = this.display.width();
+		this.display.pivotX = tmp2 * 0.25;
+		this.display.scaleX = this.display.scaleY = 1;
+		this.collision.x = x;
+		this.collision.y = y;
+		this.collision.userData = this;
+		this.collision.accelerationY = GlobalGameData.gravity;
+		this.collision.maxVelocityX = 500;
+		this.collision.maxVelocityY = 800;
+		this.collision.dragX = 0.9;
+		this.isDying = false;
+		this.currentHp = this.maxHp;
+	}
+	,reapearing: function() {
+		this.isReapiring = true;
+		this.isTransporting = false;
+		this.invulerable = true;
+		this.invulerableTime = 1;
+		this.collision.x = this.destinyX;
+		this.collision.y = this.destinyY;
+		this.timeCounter = 0;
+	}
+	,get_hitDamage: function() {
+		return this.hitDamage;
+	}
+	,addEffect: function(effect) {
+		if(!effect.isAcumulative && this.effects.length > 0) {
+			var _g_head = this.effects.h;
+			while(_g_head != null) {
+				var val = _g_head.item;
+				_g_head = _g_head.next;
+				if(val.effectName == effect.effectName) {
+					return;
+				}
+			}
 		}
-		if(this.isAirAtacking) {
-			this.display.timeline.frameRate = 0.1;
-			this.display.timeline.playAnimation("attack3",false);
+		this.effects.add(effect);
+	}
+	,removeEffect: function(effect) {
+		this.effects.remove(effect);
+	}
+	,update: function(dt) {
+		if(this.isDying && !this.receiveHeavyDamage) {
 			return;
+		}
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		if(this.isTransporting) {
+			this.timeCounter += dt;
+			if(this.invulerableTime > this.timeCounter) {
+				this.timeCounter += dt;
+			} else {
+				this.reapearing();
+			}
+			this.display.scaleX = this.display.scaleY = 1 - this.timeCounter;
+			return;
+		}
+		if(this.isReapiring) {
+			this.display.scaleX = this.display.scaleY = 0.1 + this.timeCounter;
+			if(this.invulerableTime > this.timeCounter) {
+				this.timeCounter += dt;
+			} else {
+				this.display.scaleX = this.display.scaleY = 1;
+				this.invulerable = false;
+				this.isReapiring = false;
+				this.invulerableTime = 0;
+				this.timeCounter = 0;
+			}
+			return;
+		}
+		this.collision.update(dt);
+		if(this.effects.length > 0) {
+			var _g_head = this.effects.h;
+			while(_g_head != null) {
+				var val = _g_head.item;
+				_g_head = _g_head.next;
+				val.effect(dt);
+			}
+		}
+		if(this.receiveHeavyDamage) {
+			this.receiveHeavyDamage = false;
+			this.collision.velocityX = -this.display.scaleX * 100;
+			this.collision.velocityY = -150;
+		}
+		if(this.hitCollision != null) {
+			this.hitCollision.update(dt);
+		}
+		if(this.invulerable) {
+			if(this.invulerableTime > this.timeCounter) {
+				this.timeCounter += dt;
+			} else {
+				this.invulerable = false;
+			}
+			this.display.colorMultiplication(1,1,1,0.5);
 		} else {
+			this.display.colorMultiplication(1,1,1,1);
+		}
+		if(this.hitCollision != null) {
+			if(this.hitCollision.width > 0) {
+				this.hitCollision.x = this.collision.x + this.display.scaleX * this.collision.width * 0.5 + this.collision.width * 0.5 + (this.display.scaleX * this.hitCollision.width * 0.5 - this.hitCollision.width * 0.5);
+			} else {
+				this.hitCollision.x = this.collision.x + this.collision.width * 0.5;
+			}
+			this.hitCollision.y = this.collision.y + 5;
 			var tmp;
-			if(this.display.timeline.currentAnimation == "attack3") {
+			if(this.display.timeline.currentAnimation == "attack1") {
 				var _this = this.display.timeline;
 				tmp = !(!_this.playing && !_this.loop);
 			} else {
 				tmp = false;
 			}
-			if(tmp && !this.collision.isTouching(8)) {
-				return;
+			if(tmp) {
+				this.hitCollision.width = 23;
+				this.hitCollision.height = this.collision.height * 0.5;
+				this.hitDamage = 10;
+			}
+			if(this.display.timeline.currentFrame == 13 && this.display.timeline.currentAnimation == "attack2") {
+				this.collision.velocityX = this.display.scaleX * 1000;
+				this.hitCollision.width = 30;
+				this.hitCollision.height = this.collision.height * 0.5;
+				this.hitDamage = 15;
+			}
+			if(this.keepCombo && this.display.timeline.currentFrame == 17 && this.display.timeline.currentAnimation == "attack3") {
+				this.keepCombo = false;
+				this.collision.velocityY = -200;
+				this.collision.velocityX = this.display.scaleX * 500;
+				this.hitCollision.width = 28;
+				this.hitCollision.height = this.collision.height;
+				this.hitDamage = 40;
+			}
+			if(this.isAirAtacking && this.display.timeline.currentFrame == 19 && this.display.timeline.currentAnimation == "attack3") {
+				this.isAirAtacking = false;
+				this.hitCollision.width = 28;
+				this.hitCollision.height = this.collision.height;
+				this.hitDamage = 30;
+			}
+			if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
+				this.hitCollision.width = this.hitCollision.height = 0;
+				this.hitCollision.removeFromParent();
+				this.hitDamage = 0;
 			}
 		}
-		if(this.isAtacking && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
-			this.display.timeline.frameRate = 0.1;
-			this.display.timeline.playAnimation("attack1",false);
-			this.isAtacking = false;
+		if(this.receiveLowDamage) {
+			this.receiveLowDamage = false;
+			this.collision.velocityX = -this.display.scaleX * 50;
+			this.collision.velocityY = -150;
+		}
+	}
+	,damage: function(damageRecieve) {
+		if(this.isDying) {
 			return;
 		}
-		var tmp1;
-		if(this.display.timeline.currentAnimation == "attack1") {
-			var _this1 = this.display.timeline;
-			tmp1 = !(!_this1.playing && !_this1.loop);
-		} else {
-			tmp1 = false;
+		if(damageRecieve <= 0) {
+			return;
 		}
-		if(tmp1) {
-			return;
-		} else if(this.chainCombo) {
-			this.startedComboX = this.collision.x;
-			this.display.timeline.frameRate = 0.1;
-			this.display.timeline.playAnimation("attack2",false);
-			this.chainCombo = false;
-			return;
-		} else {
-			var tmp2;
-			if(this.display.timeline.currentAnimation == "attack2") {
-				var _this2 = this.display.timeline;
-				tmp2 = !(!_this2.playing && !_this2.loop);
+		if(!this.invulerable) {
+			if(damageRecieve < this.maxHp / 4) {
+				this.receiveLowDamage = true;
 			} else {
-				tmp2 = false;
+				this.receiveHeavyDamage = true;
 			}
-			if(tmp2) {
+			this.currentHp -= damageRecieve;
+			if(this.currentHp <= 0) {
+				this.receiveHeavyDamage = true;
+				GlobalGameData.continues -= 1;
+				this.die();
 				return;
-			} else if(this.chain3rdHit && Math.abs(this.startedComboX - this.collision.x) > 50) {
-				this.display.timeline.frameRate = 0.1;
-				this.display.timeline.playAnimation("attack3",false);
-				this.keepCombo = true;
-				this.chain3rdHit = false;
+			}
+			this.invulerable = true;
+			this.invulerableTime = 1;
+			this.timeCounter = 0;
+		}
+	}
+	,die: function() {
+		if(this.isDying) {
+			return;
+		}
+		this.isDying = true;
+		this.receiveHeavyDamage = true;
+	}
+	,render: function() {
+		this.display.x = this.collision.x;
+		this.display.y = this.collision.y;
+		var s = Math.abs(this.collision.velocityX / this.collision.maxVelocityX);
+		if(this.isDying) {
+			if(this.display.timeline.currentAnimation == "heavyDamage") {
+				return;
+			}
+			this.display.timeline.playAnimation("heavyDamage",false);
+			return;
+		}
+		if(this.receiveLowDamage) {
+			this.display.timeline.frameRate = 0.1;
+			this.display.timeline.playAnimation("damage",false);
+		} else if(this.receiveHeavyDamage) {
+			this.display.timeline.frameRate = 0.1;
+			this.display.timeline.playAnimation("heavyDamage",false);
+		} else {
+			var tmp;
+			if(this.display.timeline.currentAnimation == "damage" || this.display.timeline.currentAnimation == "heavyDamage") {
+				var _this = this.display.timeline;
+				tmp = !(!_this.playing && !_this.loop);
+			} else {
+				tmp = false;
+			}
+			if(tmp) {
 				return;
 			} else {
-				var tmp3;
-				if(this.display.timeline.currentAnimation == "attack3") {
-					var _this3 = this.display.timeline;
-					tmp3 = !(!_this3.playing && !_this3.loop);
-				} else {
-					tmp3 = false;
+				if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
+					this.display.timeline.frameRate = 0.0333333333333333329 * s + (1 - s) * 0.1;
 				}
-				if(tmp3) {
-					return;
-				} else if(this.collision.isTouching(8) && this.collision.velocityX * this.collision.accelerationX < 0) {
-					this.display.timeline.playAnimation("slide");
-				} else if(this.collision.isTouching(8) && this.collision.velocityX == 0) {
-					this.display.timeline.playAnimation("idle");
+				var tmp1;
+				if(this.display.timeline.currentAnimation == "rangeAttack") {
+					var _this1 = this.display.timeline;
+					tmp1 = !(!_this1.playing && !_this1.loop);
 				} else {
-					var tmp4;
-					if(this.collision.isTouching(8) && this.collision.velocityX != 0 && this.display.timeline.currentAnimation != "attack2") {
-						var tmp5;
-						if(this.display.timeline.currentAnimation == "attack3") {
-							var _this4 = this.display.timeline;
-							tmp5 = !_this4.playing && !_this4.loop;
-						} else {
-							tmp5 = false;
-						}
-						tmp4 = tmp5 || this.display.timeline.currentAnimation != "attack3";
+					tmp1 = false;
+				}
+				if(tmp1) {
+					return;
+				}
+				if(this.isAirAtacking) {
+					this.display.timeline.frameRate = 0.1;
+					this.display.timeline.playAnimation("attack3",false);
+					return;
+				} else {
+					var tmp2;
+					if(this.display.timeline.currentAnimation == "attack3") {
+						var _this2 = this.display.timeline;
+						tmp2 = !(!_this2.playing && !_this2.loop);
 					} else {
-						tmp4 = false;
+						tmp2 = false;
 					}
-					if(tmp4) {
-						this.display.timeline.playAnimation("run");
+					if(tmp2 && !this.collision.isTouching(8)) {
+						return;
+					}
+				}
+				if(this.isAtacking && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3" && this.display.timeline.currentAnimation != "rangeAttack") {
+					this.display.timeline.frameRate = 0.1;
+					this.display.timeline.playAnimation("attack1",false);
+					this.isAtacking = false;
+					return;
+				} else {
+					var tmp3;
+					if(this.display.timeline.currentAnimation == "attack1") {
+						var _this3 = this.display.timeline;
+						tmp3 = !(!_this3.playing && !_this3.loop);
 					} else {
-						var tmp6;
-						if(!this.collision.isTouching(8) && this.collision.velocityY > 0) {
-							var tmp7;
+						tmp3 = false;
+					}
+					if(tmp3) {
+						return;
+					} else if(this.chainCombo) {
+						this.startedComboX = this.collision.x;
+						this.display.timeline.frameRate = 0.1;
+						this.display.timeline.playAnimation("attack2",false);
+						this.chainCombo = false;
+						return;
+					} else {
+						var tmp4;
+						if(this.display.timeline.currentAnimation == "attack2") {
+							var _this4 = this.display.timeline;
+							tmp4 = !(!_this4.playing && !_this4.loop);
+						} else {
+							tmp4 = false;
+						}
+						if(tmp4) {
+							return;
+						} else if(this.chain3rdHit && Math.abs(this.startedComboX - this.collision.x) > 50) {
+							this.display.timeline.frameRate = 0.1;
+							this.display.timeline.playAnimation("attack3",false);
+							this.keepCombo = true;
+							this.chain3rdHit = false;
+							return;
+						} else {
+							var tmp5;
 							if(this.display.timeline.currentAnimation == "attack3") {
 								var _this5 = this.display.timeline;
-								tmp7 = !_this5.playing && !_this5.loop;
+								tmp5 = !(!_this5.playing && !_this5.loop);
 							} else {
-								tmp7 = false;
+								tmp5 = false;
 							}
-							tmp6 = tmp7 || this.display.timeline.currentAnimation != "attack3";
-						} else {
-							tmp6 = false;
-						}
-						if(tmp6) {
-							this.display.timeline.frameRate = 0.2;
-							this.display.timeline.playAnimation("fall");
-						} else if(!this.collision.isTouching(8) && this.collision.velocityY < 0 && this.display.timeline.currentAnimation != "attack3") {
-							this.display.timeline.playAnimation("jump");
+							if(tmp5) {
+								return;
+							} else if(this.collision.isTouching(8) && this.collision.velocityX * this.collision.accelerationX < 0) {
+								this.display.timeline.playAnimation("slide");
+							} else if(this.collision.isTouching(8) && this.collision.velocityX == 0) {
+								this.display.timeline.playAnimation("idle");
+							} else {
+								var tmp6;
+								if(this.collision.isTouching(8) && this.collision.velocityX != 0 && this.display.timeline.currentAnimation != "attack2") {
+									var tmp7;
+									if(this.display.timeline.currentAnimation == "attack3") {
+										var _this6 = this.display.timeline;
+										tmp7 = !_this6.playing && !_this6.loop;
+									} else {
+										tmp7 = false;
+									}
+									tmp6 = tmp7 || this.display.timeline.currentAnimation != "attack3";
+								} else {
+									tmp6 = false;
+								}
+								if(tmp6) {
+									this.display.timeline.playAnimation("run");
+								} else {
+									var tmp8;
+									if(!this.collision.isTouching(8) && this.collision.velocityY > 0) {
+										var tmp9;
+										if(this.display.timeline.currentAnimation == "attack3") {
+											var _this7 = this.display.timeline;
+											tmp9 = !_this7.playing && !_this7.loop;
+										} else {
+											tmp9 = false;
+										}
+										tmp8 = tmp9 || this.display.timeline.currentAnimation != "attack3";
+									} else {
+										tmp8 = false;
+									}
+									if(tmp8) {
+										this.display.timeline.frameRate = 0.2;
+										this.display.timeline.playAnimation("fall");
+									} else if(!this.collision.isTouching(8) && this.collision.velocityY < 0 && this.display.timeline.currentAnimation != "attack3") {
+										this.display.timeline.playAnimation("jump");
+									}
+								}
+							}
 						}
 					}
 				}
@@ -8884,8 +9727,18 @@ gameObjects_ChivitoBoy.prototype = $extend(com_framework_utils_Entity.prototype,
 		}
 	}
 	,onButtonChange: function(id,value) {
+		var tmp;
+		if(this.display.timeline.currentAnimation == "rangeAttack") {
+			var _this = this.display.timeline;
+			tmp = !(!_this.playing && !_this.loop);
+		} else {
+			tmp = false;
+		}
+		if(tmp) {
+			return;
+		}
 		if(id == 14) {
-			if(value == 1) {
+			if(value == 1 && !this.isDying) {
 				this.collision.accelerationX = -this.maxSpeed * 4;
 				this.display.scaleX = -Math.abs(this.display.scaleX);
 			} else if(this.collision.accelerationX < 0) {
@@ -8902,18 +9755,18 @@ gameObjects_ChivitoBoy.prototype = $extend(com_framework_utils_Entity.prototype,
 		}
 		if(id == 0) {
 			if(value == 1) {
-				var tmp;
+				var tmp1;
 				if(this.collision.isTouching(8)) {
 					if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
-						var _this = this.display.timeline;
-						tmp = !(!_this.playing && !_this.loop);
+						var _this1 = this.display.timeline;
+						tmp1 = !(!_this1.playing && !_this1.loop);
 					} else {
-						tmp = false;
+						tmp1 = false;
 					}
 				} else {
-					tmp = false;
+					tmp1 = false;
 				}
-				if(tmp) {
+				if(tmp1) {
 					this.collision.velocityY = -1000;
 				}
 			}
@@ -8933,6 +9786,8 @@ gameObjects_ChivitoBoy.prototype = $extend(com_framework_utils_Entity.prototype,
 	,attack: function() {
 		if(this.display.timeline.currentAnimation != "attack1" && this.display.timeline.currentAnimation != "attack2" && this.display.timeline.currentAnimation != "attack3") {
 			this.isAtacking = true;
+			this.hitCollision = new com_collision_platformer_CollisionBox();
+			this.hitCollision.userData = this;
 		}
 		var tmp;
 		if(this.display.timeline.currentAnimation == "attack1") {
@@ -8956,62 +9811,520 @@ gameObjects_ChivitoBoy.prototype = $extend(com_framework_utils_Entity.prototype,
 		}
 	}
 	,airAttack: function() {
+		this.hitDamage = 20;
+		this.hitCollision = new com_collision_platformer_CollisionBox();
+		this.hitCollision.userData = this;
 		this.isAirAtacking = true;
 	}
 	,onAxisChange: function(id,value) {
 	}
-	,__class__: gameObjects_ChivitoBoy
+	,__class__: gameObjects_Player
 });
-var gameObjects_Jason = function(layer,collisions,x,y) {
+var gameObjects_Torch = function(layer,collisions,x,y) {
 	com_framework_utils_Entity.call(this);
-	this.collisionGroup = collisions;
-	this.display = new com_gEngine_display_Sprite("dummy");
-	layer.addChild(this.display);
+	this.display = new com_gEngine_display_Sprite("torch");
+	this.display.timeline.playAnimation("idle");
 	this.collision = new com_collision_platformer_CollisionBox();
+	this.collisionGroup = collisions;
 	this.collision.userData = this;
+	this.collision.width = this.display.width();
+	this.collision.height = this.display.height();
 	collisions.add(this.collision);
-	this.display.offsetX = -this.display.width() / 6;
-	this.display.scaleX = 0.333333333333333315;
-	this.display.scaleY = 0.333333333333333315;
-	var tmp = this.display.width();
-	this.collision.width = tmp / 3;
-	var tmp1 = this.display.height();
-	this.collision.height = tmp1 / 3;
-	this.display.timeline.frameRate = 0.1;
-	this.display.set_smooth(false);
-	this.collision.x = x;
-	this.collision.y = y;
-	this.collision.accelerationY = 2000;
+	this.display.x = this.collision.x = x;
+	this.display.y = this.collision.y = y;
+	this.collision.accelerationY = GlobalGameData.gravity;
+	layer.addChild(this.display);
 };
-$hxClasses["gameObjects.Jason"] = gameObjects_Jason;
-gameObjects_Jason.__name__ = "gameObjects.Jason";
-gameObjects_Jason.__super__ = com_framework_utils_Entity;
-gameObjects_Jason.prototype = $extend(com_framework_utils_Entity.prototype,{
+$hxClasses["gameObjects.Torch"] = gameObjects_Torch;
+gameObjects_Torch.__name__ = "gameObjects.Torch";
+gameObjects_Torch.__super__ = com_framework_utils_Entity;
+gameObjects_Torch.prototype = $extend(com_framework_utils_Entity.prototype,{
 	update: function(dt) {
 		com_framework_utils_Entity.prototype.update.call(this,dt);
 		this.collision.update(dt);
+		this.display.x = this.collision.x;
+		this.display.y = this.collision.y;
 	}
-	,damage: function() {
-		haxe_Log.trace("should be dead",{ fileName : "gameObjects/Jason.hx", lineNumber : 61, className : "gameObjects.Jason", methodName : "damage"});
-		this.display.offsetY = -35;
+	,die: function() {
+		com_framework_utils_Entity.prototype.die.call(this);
 		this.collision.removeFromParent();
+		this.display.removeFromParent();
+	}
+	,__class__: gameObjects_Torch
+});
+var gameObjects_effects_BlueFireball = function() {
+	this.hitDamage = 30;
+	this.currentTime = 0;
+	this.lifeTime = 4;
+	com_framework_utils_Entity.call(this);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.display = new com_gEngine_display_Sprite("blueFireball");
+	var tmp = this.display.width();
+	this.collision.width = tmp / 2;
+	var tmp1 = this.display.height();
+	this.collision.height = tmp1 / 2;
+	this.collision.userData = this;
+};
+$hxClasses["gameObjects.effects.BlueFireball"] = gameObjects_effects_BlueFireball;
+gameObjects_effects_BlueFireball.__name__ = "gameObjects.effects.BlueFireball";
+gameObjects_effects_BlueFireball.__super__ = com_framework_utils_Entity;
+gameObjects_effects_BlueFireball.prototype = $extend(com_framework_utils_Entity.prototype,{
+	get_hitDamage: function() {
+		return this.hitDamage;
+	}
+	,die: function() {
+		com_framework_utils_Entity.prototype.die.call(this);
+		this.limboStart();
+	}
+	,limboStart: function() {
+		this.display.removeFromParent();
+		this.collision.removeFromParent();
+	}
+	,update: function(dt) {
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		this.currentTime += dt;
+		this.collision.update(dt);
+		this.display.x = this.collision.x;
+		this.display.y = this.collision.y;
+		if(this.lifeTime - this.currentTime < 1) {
+			this.display.scaleX = this.dirX * (this.lifeTime - this.currentTime);
+			this.display.scaleY = this.lifeTime - this.currentTime;
+			var tmp = this.display.width();
+			this.collision.width = tmp * Math.abs(this.display.scaleX);
+			var tmp1 = this.display.height();
+			this.collision.height = tmp1 * this.display.scaleY;
+		}
+		if(this.currentTime >= this.lifeTime) {
+			this.die();
+		}
+	}
+	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		this.display = new com_gEngine_display_Sprite("blueFireball");
+		this.display.scaleX = dirX * -0.333333333333333315 * 2;
+		this.display.scaleY = 0.66666666666666663;
+		var tmp = this.display.width() * 2;
+		this.collision.width = tmp / 3;
+		var tmp1 = this.display.height() * 2;
+		this.collision.height = tmp1 / 3;
+		this.dirX = dirX;
+		this.currentTime = 0;
+		this.collision.x = x;
+		this.collision.y = y;
+		var tmp2 = this.display.width() / 3;
+		var tmp3 = this.display.scaleX * 3 / 2 * (this.display.width() / 3);
+		this.display.offsetX = tmp2 - tmp3;
+		this.display.set_smooth(false);
+		this.collision.velocityX = 300 * dirX;
+		this.collision.velocityY = 0;
+		GlobalGameData.playerProyectilesCollisions.add(this.collision);
+		GlobalGameData.simulationLayer.addChild(this.display);
+		this.display.timeline.playAnimation("idle");
+		this.display.timeline.frameRate = 0.1;
+	}
+	,__class__: gameObjects_effects_BlueFireball
+});
+var gameObjects_effects_Confusion = function(player) {
+	this.currentTime = 0;
+	this.durationTime = 4;
+	gameObjects_Effect.call(this,player);
+	this.effectName = "Confusion";
+};
+$hxClasses["gameObjects.effects.Confusion"] = gameObjects_effects_Confusion;
+gameObjects_effects_Confusion.__name__ = "gameObjects.effects.Confusion";
+gameObjects_effects_Confusion.__super__ = gameObjects_Effect;
+gameObjects_effects_Confusion.prototype = $extend(gameObjects_Effect.prototype,{
+	effect: function(dt) {
+		this.currentTime += dt;
+		if(this.currentTime >= this.durationTime) {
+			this.player.removeEffect(this);
+		}
+		if(com_framework_utils_Input.i.isKeyCodeDown(37)) {
+			this.player.collision.accelerationX = 100;
+			this.player.display.scaleX = 1;
+		}
+		if(com_framework_utils_Input.i.isKeyCodeDown(39)) {
+			this.player.collision.accelerationX = -100;
+			this.player.display.scaleX = -1;
+		}
+		if(!com_framework_utils_Input.i.isKeyCodeDown(39) && !com_framework_utils_Input.i.isKeyCodeDown(37)) {
+			this.player.collision.accelerationX = 0;
+			this.player.collision.velocityX = 0;
+		}
+	}
+	,__class__: gameObjects_effects_Confusion
+});
+var gameObjects_effects_RangeAttack = function(player) {
+	this.currentTime = 0;
+	this.cooldown = 4;
+	this.shooted = false;
+	this.inCooldown = false;
+	gameObjects_Effect.call(this,player);
+	this.pool = true;
+	this.isAcumulative = false;
+	this.effectName = "RangeAttack";
+	this.proyectilesCollisions = GlobalGameData.playerProyectilesCollisions;
+	player.addChild(this);
+};
+$hxClasses["gameObjects.effects.RangeAttack"] = gameObjects_effects_RangeAttack;
+gameObjects_effects_RangeAttack.__name__ = "gameObjects.effects.RangeAttack";
+gameObjects_effects_RangeAttack.__super__ = gameObjects_Effect;
+gameObjects_effects_RangeAttack.prototype = $extend(gameObjects_Effect.prototype,{
+	effect: function(dt) {
+		this.currentTime += dt;
+		if(this.currentTime >= this.cooldown) {
+			this.inCooldown = false;
+		}
+		if(com_framework_utils_Input.i.isKeyCodePressed(65) && !this.inCooldown) {
+			this.inCooldown = true;
+			this.currentTime = 0;
+			this.shooted = false;
+			this.player.collision.accelerationX = 0;
+			this.player.display.timeline.frameRate = 0.1;
+			this.player.display.timeline.playAnimation("rangeAttack",false);
+		}
+		if(this.inCooldown && !this.shooted && this.player.display.timeline.currentAnimation == "rangeAttack" && this.player.display.timeline.currentFrame == 7) {
+			this.shooted = true;
+			this.shoot(this.player.get_x(),this.player.get_y() - this.player.display.height() + 20,this.player.display.scaleX,0);
+		}
+	}
+	,shoot: function(aX,aY,dirX,dirY) {
+		var fireball = this.recycle(gameObjects_effects_BlueFireball);
+		fireball.shoot(aX,aY,dirX,dirY,this.proyectilesCollisions);
+	}
+	,__class__: gameObjects_effects_RangeAttack
+});
+var gameObjects_enemyMinions_Fireball = function() {
+	this.hitDamage = 60;
+	this.currentTime = 0;
+	this.lifeTime = 4;
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Sprite("fireball");
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collision.width = this.display.width();
+	this.collision.height = this.display.height();
+	this.collision.userData = this;
+};
+$hxClasses["gameObjects.enemyMinions.Fireball"] = gameObjects_enemyMinions_Fireball;
+gameObjects_enemyMinions_Fireball.__name__ = "gameObjects.enemyMinions.Fireball";
+gameObjects_enemyMinions_Fireball.__super__ = com_framework_utils_Entity;
+gameObjects_enemyMinions_Fireball.prototype = $extend(com_framework_utils_Entity.prototype,{
+	get_hitDamage: function() {
+		return this.hitDamage;
+	}
+	,die: function() {
+		com_framework_utils_Entity.prototype.die.call(this);
+		this.limboStart();
+	}
+	,limboStart: function() {
+		this.display.removeFromParent();
+		this.collision.removeFromParent();
+	}
+	,update: function(dt) {
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		this.currentTime += dt;
+		this.collision.update(dt);
+		this.display.x = this.collision.x;
+		this.display.y = this.collision.y;
+		if(this.lifeTime - this.currentTime < 1) {
+			this.display.scaleX = this.dirX * (this.lifeTime - this.currentTime);
+			this.display.scaleY = this.lifeTime - this.currentTime;
+			var tmp = this.display.width();
+			this.collision.width = tmp * Math.abs(this.display.scaleX);
+			var tmp1 = this.display.height();
+			this.collision.height = tmp1 * this.display.scaleY;
+		}
+		if(this.currentTime >= this.lifeTime) {
+			this.die();
+		}
+	}
+	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		this.display.scaleX = dirX;
+		this.display.scaleY = 1;
+		this.collision.width = this.display.width();
+		this.collision.height = this.display.height();
+		this.dirX = dirX;
+		this.currentTime = 0;
+		this.collision.x = x;
+		this.collision.y = y;
+		var tmp = this.display.width() / 4;
+		var tmp1 = dirX * this.display.width() / 4;
+		this.display.offsetX = tmp - tmp1;
+		var tmp2 = this.display.width();
+		this.display.pivotX = tmp2 * 0.25;
+		this.display.set_smooth(false);
+		this.collision.velocityX = 150 * this.display.scaleX;
+		this.collision.velocityY = 0;
+		proyectileCollision.add(this.collision);
+		GlobalGameData.simulationLayer.addChild(this.display);
+		this.display.timeline.playAnimation("idle");
+		this.display.timeline.frameRate = 0.1;
+	}
+	,__class__: gameObjects_enemyMinions_Fireball
+});
+var gameObjects_enemyMinions_Firebreath = function(enemyProyectilesCollisions) {
+	com_framework_utils_Entity.call(this);
+	this.pool = true;
+	this.proyectilesCollisions = enemyProyectilesCollisions;
+};
+$hxClasses["gameObjects.enemyMinions.Firebreath"] = gameObjects_enemyMinions_Firebreath;
+gameObjects_enemyMinions_Firebreath.__name__ = "gameObjects.enemyMinions.Firebreath";
+gameObjects_enemyMinions_Firebreath.__super__ = com_framework_utils_Entity;
+gameObjects_enemyMinions_Firebreath.prototype = $extend(com_framework_utils_Entity.prototype,{
+	shoot: function(aX,aY,dirX,dirY) {
+		var fireball = this.recycle(gameObjects_enemyMinions_Fireball);
+		fireball.shoot(aX,aY,dirX,dirY,this.proyectilesCollisions);
+	}
+	,__class__: gameObjects_enemyMinions_Firebreath
+});
+var gameObjects_enemyMinions_Ghost = function(layer,collisions,x,y) {
+	this.MAX_SPEED = 200;
+	gameObjects_EnemyMinion.call(this,layer,collisions,x,y);
+	this.hitDamage = 10;
+	this.agressionRange = 200;
+	this.scorePoints = this.currentHp = this.hpMax = 50;
+	this.display = new com_gEngine_display_Sprite("ghost");
+	layer.addChild(this.display);
+	this.hitTimes = Math.ceil(Math.random() * 3);
+	this.display.timeline.frameRate = 0.04;
+	this.display.timeline.playAnimation("idle");
+	this.display.offsetX = -this.display.width() / 6;
+	this.display.offsetY = -this.display.height() * 0.25;
+	var tmp = this.display.width();
+	this.display.pivotX = tmp * 0.25;
+	this.display.offsetY = -this.display.height() / 3;
+	this.display.set_smooth(false);
+	var tmp1 = this.display.width();
+	this.collision.width = tmp1 / 3;
+	var tmp2 = this.display.height();
+	this.collision.height = tmp2 / 3;
+	if(this.hitTimes == 1) {
+		this.display.colorMultiplication(1,0,1,1);
+	} else {
+		this.display.colorMultiplication(1,1,1,1);
+	}
+};
+$hxClasses["gameObjects.enemyMinions.Ghost"] = gameObjects_enemyMinions_Ghost;
+gameObjects_enemyMinions_Ghost.__name__ = "gameObjects.enemyMinions.Ghost";
+gameObjects_enemyMinions_Ghost.__super__ = gameObjects_EnemyMinion;
+gameObjects_enemyMinions_Ghost.prototype = $extend(gameObjects_EnemyMinion.prototype,{
+	get_hitDamage: function() {
+		if(!this.stunned && !this.target.invulerable && !this.target.isDead()) {
+			this.hitTimes++;
+			this.hitTimes %= 3;
+			if(this.hitTimes == 1) {
+				this.target.addEffect(new gameObjects_effects_Confusion(this.target));
+			}
+		}
+		return gameObjects_EnemyMinion.prototype.get_hitDamage.call(this);
+	}
+	,update: function(dt) {
+		gameObjects_EnemyMinion.prototype.update.call(this,dt);
+		if(this.hitTimes == 0) {
+			this.display.colorMultiplication(1,0,1,1);
+		} else {
+			this.display.colorMultiplication(1,1,1,1);
+		}
+	}
+	,aggresiveStance: function(dt) {
+		var x = this.target.get_x() - (this.collision.x + this.collision.width * 0.5);
+		var y = this.target.get_y() - (this.collision.y + this.collision.height * 1.5);
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		var dir_x = x;
+		var dir_y = y;
+		if(Math.abs(dir_x) < 10) {
+			dir_x = 0;
+		}
+		if(Math.abs(dir_y) < 10) {
+			dir_y = 0;
+		}
+		var x1 = dir_x;
+		var y1 = dir_y;
+		if(y1 == null) {
+			y1 = 0;
+		}
+		if(x1 == null) {
+			x1 = 0;
+		}
+		var v_x = x1;
+		var v_y = y1;
+		var currentLength = Math.sqrt(v_x * v_x + v_y * v_y);
+		if(currentLength != 0) {
+			var mul = 1 / currentLength;
+			v_x *= mul;
+			v_y *= mul;
+		}
+		dir_x = v_x;
+		dir_y = v_y;
+		var value = this.MAX_SPEED;
+		var x2 = dir_x * value;
+		var y2 = dir_y * value;
+		if(y2 == null) {
+			y2 = 0;
+		}
+		if(x2 == null) {
+			x2 = 0;
+		}
+		var v_x1 = x2;
+		var v_y1 = y2;
+		dir_x = v_x1;
+		dir_y = v_y1;
+		this.collision.accelerationX = dir_x;
+		this.collision.accelerationY = dir_y;
+		this.collision.maxVelocityX = this.collision.maxVelocityX = 100;
+	}
+	,passiveStance: function(dt) {
+		this.collision.velocityX = 0;
+		this.collision.velocityY = 0;
 	}
 	,render: function() {
 		this.display.x = this.collision.x + this.collision.width * 0.5;
 		this.display.y = this.collision.y;
-		if(this.display.timeline.currentAnimation == "die_") {
+		if(this.display.timeline.currentAnimation == "die") {
+			return;
+		}
+		if(this.stunned) {
 			return;
 		}
 		if(Math.abs(this.collision.velocityX) > Math.abs(this.collision.velocityY)) {
-			if(this.collision.velocityX > 0) {
+			if(this.collision.accelerationX > 0) {
+				if(this.collision.velocityX < 0) {
+					this.display.timeline.playAnimation("slide");
+				} else {
+					this.display.scaleX = -1;
+					this.display.timeline.playAnimation("idle");
+				}
+			} else if(this.collision.velocityX > 0) {
+				this.display.timeline.playAnimation("slide");
+			} else {
+				this.display.scaleX = 1;
+				this.display.timeline.playAnimation("idle");
+			}
+		}
+		gameObjects_EnemyMinion.prototype.render.call(this);
+	}
+	,__class__: gameObjects_enemyMinions_Ghost
+});
+var gameObjects_enemyMinions_Salamander = function(layer,collisions,x,y,enemyProyectilesCollisions) {
+	this.shoot = false;
+	this.walkLeft = false;
+	this.standTimeCounter = 0;
+	this.walkTimeCounter = 2;
+	this.walkTime = 2;
+	this.timeBetweenAtacksCounter = 0;
+	this.timeBetweenAtacks = 2;
+	gameObjects_EnemyMinion.call(this,layer,collisions,x,y);
+	this.hitDamage = 10;
+	this.scorePoints = this.currentHp = this.hpMax = 100;
+	this.firebreath = new gameObjects_enemyMinions_Firebreath(enemyProyectilesCollisions);
+	this.addChild(this.firebreath);
+	this.agressionRange = 200;
+	this.display = new com_gEngine_display_Sprite("salamander");
+	this.display.timeline.playAnimation("idle");
+	this.display.timeline.frameRate = 0.1;
+	this.display.set_smooth(false);
+	var tmp = -this.display.width() / 2;
+	this.display.offsetX = tmp + 5;
+	this.display.offsetY = -this.display.height() / 2;
+	var tmp1 = this.display.width();
+	this.display.pivotX = tmp1 * 0.4;
+	var tmp2 = this.display.width();
+	this.collision.width = tmp2 / 2;
+	var tmp3 = this.display.height();
+	this.collision.height = tmp3 / 2;
+	layer.addChild(this.display);
+	this.collision.accelerationY = GlobalGameData.gravity;
+};
+$hxClasses["gameObjects.enemyMinions.Salamander"] = gameObjects_enemyMinions_Salamander;
+gameObjects_enemyMinions_Salamander.__name__ = "gameObjects.enemyMinions.Salamander";
+gameObjects_enemyMinions_Salamander.__super__ = gameObjects_EnemyMinion;
+gameObjects_enemyMinions_Salamander.prototype = $extend(gameObjects_EnemyMinion.prototype,{
+	update: function(dt) {
+		this.collision.update(dt);
+		gameObjects_EnemyMinion.prototype.update.call(this,dt);
+		if(this.display.timeline.currentFrame == 19 && !this.shoot) {
+			this.firebreath.shoot(this.get_x(),this.get_y() - this.display.height() / 2,this.display.scaleX,0);
+			this.shoot = true;
+		}
+	}
+	,aggresiveStance: function(dt) {
+		this.collision.velocityX = 0;
+		if(this.target.get_x() - this.collision.x > 0) {
+			this.display.scaleX = 1;
+		} else {
+			this.display.scaleX = -1;
+		}
+		if(this.timeBetweenAtacks <= this.timeBetweenAtacksCounter) {
+			this.attack();
+			this.timeBetweenAtacksCounter = 0;
+		} else {
+			this.timeBetweenAtacksCounter += dt;
+		}
+	}
+	,passiveStance: function(dt) {
+		this.timeBetweenAtacksCounter = this.timeBetweenAtacks;
+		if(this.standTimeCounter < this.walkTime) {
+			this.collision.velocityX = 0;
+			this.standTimeCounter += dt;
+			if(this.standTimeCounter > this.walkTime) {
+				this.walkTimeCounter = 0;
+				this.walkLeft = !this.walkLeft;
+			}
+		}
+		if(this.walkTimeCounter < this.walkTime) {
+			if(this.walkLeft) {
+				this.collision.velocityX = -50;
+			} else {
+				this.collision.velocityX = 50;
+			}
+			this.walkTimeCounter += dt;
+			if(this.walkTimeCounter > this.walkTime) {
+				this.standTimeCounter = 0;
+			}
+		}
+	}
+	,attack: function() {
+		if(this.display.timeline.currentAnimation != "attack") {
+			this.display.timeline.playAnimation("attack",false);
+			this.shoot = false;
+		}
+	}
+	,render: function() {
+		this.display.x = this.collision.x + this.collision.width * 0.5;
+		this.display.y = this.collision.y;
+		if(this.display.timeline.currentAnimation == "die") {
+			return;
+		}
+		if(this.stunned) {
+			return;
+		}
+		var tmp;
+		if(this.display.timeline.currentAnimation == "attack") {
+			var _this = this.display.timeline;
+			tmp = !(!_this.playing && !_this.loop);
+		} else {
+			tmp = false;
+		}
+		if(tmp) {
+			return;
+		}
+		gameObjects_EnemyMinion.prototype.render.call(this);
+		if(this.walkTimeCounter < this.walkTime) {
+			this.display.timeline.playAnimation("walk");
+			if(!this.walkLeft) {
 				this.display.scaleX = 1;
 			} else {
 				this.display.scaleX = -1;
 			}
+		} else {
+			this.display.timeline.playAnimation("idle");
 		}
-		com_framework_utils_Entity.prototype.render.call(this);
 	}
-	,__class__: gameObjects_Jason
+	,__class__: gameObjects_enemyMinions_Salamander
 });
 var haxe_IMap = function() { };
 $hxClasses["haxe.IMap"] = haxe_IMap;
@@ -9646,6 +10959,27 @@ haxe_ds_List.prototype = {
 		}
 		this.q = x;
 		this.length++;
+	}
+	,remove: function(v) {
+		var prev = null;
+		var l = this.h;
+		while(l != null) {
+			if(l.item == v) {
+				if(prev == null) {
+					this.h = l.next;
+				} else {
+					prev.next = l.next;
+				}
+				if(this.q == l) {
+					this.q = prev;
+				}
+				this.length--;
+				return true;
+			}
+			prev = l;
+			l = l.next;
+		}
+		return false;
 	}
 	,__class__: haxe_ds_List
 };
@@ -11500,18 +12834,36 @@ js_Boot.__resolveNativeClass = function(name) {
 	return $global[name];
 };
 var kha__$Assets_ImageList = function() {
-	this.tiles2Description = { name : "tiles2", original_height : 416, file_sizes : [1967], original_width : 32, files : ["tiles2.png"], type : "image"};
+	this.yoDescription = { name : "yo", original_height : 504, file_sizes : [2594], original_width : 185, files : ["yo.png"], type : "image"};
+	this.yo = null;
+	this.torchDescription = { name : "torch", original_height : 150, file_sizes : [6376], original_width : 145, files : ["torch.png"], type : "image"};
+	this.torch = null;
+	this.tiles2Description = { name : "tiles2", original_height : 128, file_sizes : [1967], original_width : 160, files : ["tiles2.png"], type : "image"};
 	this.tiles2 = null;
+	this.sandDescription = { name : "sand", original_height : 128, file_sizes : [27658], original_width : 160, files : ["sand.png"], type : "image"};
+	this.sand = null;
 	this.saltDescription = { name : "salt", original_height : 36, file_sizes : [524], original_width : 29, files : ["salt.png"], type : "image"};
 	this.salt = null;
-	this.jasonDescription = { name : "jason", original_height : 362, file_sizes : [14448], original_width : 120, files : ["jason.png"], type : "image"};
-	this.jason = null;
-	this.hero1Description = { name : "hero1", original_height : 180, file_sizes : [16820], original_width : 225, files : ["hero1.png"], type : "image"};
-	this.hero1 = null;
-	this.heroDescription = { name : "hero", original_height : 563, file_sizes : [45074], original_width : 679, files : ["hero.png"], type : "image"};
+	this.salamanderDescription = { name : "salamander", original_height : 160, file_sizes : [10351], original_width : 420, files : ["salamander.png"], type : "image"};
+	this.salamander = null;
+	this.logoDescription = { name : "logo", original_height : 149, file_sizes : [25056], original_width : 200, files : ["logo.png"], type : "image"};
+	this.logo = null;
+	this.heroDescription = { name : "hero", original_height : 300, file_sizes : [45074], original_width : 720, files : ["hero.png"], type : "image"};
 	this.hero = null;
-	this.dummyDescription = { name : "dummy", original_height : 183, file_sizes : [40129], original_width : 167, files : ["dummy.png"], type : "image"};
-	this.dummy = null;
+	this.hellsGateIntroDescription = { name : "hellsGateIntro", original_height : 1700, file_sizes : [1687533], original_width : 2560, files : ["hellsGateIntro.jpg"], type : "image"};
+	this.hellsGateIntro = null;
+	this.ghostDescription = { name : "ghost", original_height : 420, file_sizes : [29620], original_width : 600, files : ["ghost.png"], type : "image"};
+	this.ghost = null;
+	this.gateDescription = { name : "gate", original_height : 85, file_sizes : [22341], original_width : 450, files : ["gate.png"], type : "image"};
+	this.gate = null;
+	this.gameOverDescription = { name : "gameOver", original_height : 244, file_sizes : [17088], original_width : 231, files : ["gameOver.png"], type : "image"};
+	this.gameOver = null;
+	this.fireballDescription = { name : "fireball", original_height : 25, file_sizes : [994], original_width : 66, files : ["fireball.png"], type : "image"};
+	this.fireball = null;
+	this.blueFireballDescription = { name : "blueFireball", original_height : 25, file_sizes : [13162], original_width : 272, files : ["blueFireball.png"], type : "image"};
+	this.blueFireball = null;
+	this.avatarDescription = { name : "avatar", original_height : 21, file_sizes : [658], original_width : 21, files : ["avatar.png"], type : "image"};
+	this.avatar = null;
 };
 $hxClasses["kha._Assets.ImageList"] = kha__$Assets_ImageList;
 kha__$Assets_ImageList.__name__ = "kha._Assets.ImageList";
@@ -11522,13 +12874,13 @@ kha__$Assets_ImageList.prototype = {
 	,__class__: kha__$Assets_ImageList
 };
 var kha__$Assets_BlobList = function() {
-	this.testRoom_tmxDescription = { name : "testRoom_tmx", file_sizes : [4056], files : ["testRoom.tmx"], type : "blob"};
+	this.yo_tsxDescription = { name : "yo_tsx", file_sizes : [215], files : ["yo.tsx"], type : "blob"};
+	this.yo_tsx = null;
+	this.testRoom_tmxDescription = { name : "testRoom_tmx", file_sizes : [7487], files : ["testRoom.tmx"], type : "blob"};
 	this.testRoom_tmxName = "testRoom_tmx";
 	this.testRoom_tmx = null;
-	this.jason_xmlDescription = { name : "jason_xml", file_sizes : [3260], files : ["jason.xml"], type : "blob"};
-	this.jason_xml = null;
-	this.dummy_tsxDescription = { name : "dummy_tsx", file_sizes : [220], files : ["dummy.tsx"], type : "blob"};
-	this.dummy_tsx = null;
+	this.sand_tsxDescription = { name : "sand_tsx", file_sizes : [228], files : ["sand.tsx"], type : "blob"};
+	this.sand_tsx = null;
 };
 $hxClasses["kha._Assets.BlobList"] = kha__$Assets_BlobList;
 kha__$Assets_BlobList.__name__ = "kha._Assets.BlobList";
@@ -11541,6 +12893,9 @@ kha__$Assets_BlobList.prototype = {
 var kha__$Assets_FontList = function() {
 	this.mainfontDescription = { name : "mainfont", file_sizes : [91504], files : ["mainfont.ttf"], type : "font"};
 	this.mainfont = null;
+	this.PixelOperator8_BoldDescription = { name : "PixelOperator8_Bold", file_sizes : [18596], files : ["PixelOperator8-Bold.ttf"], type : "font"};
+	this.PixelOperator8_BoldName = "PixelOperator8_Bold";
+	this.PixelOperator8_Bold = null;
 	this.Kenney_PixelDescription = { name : "Kenney_Pixel", file_sizes : [28276], files : ["Kenney Pixel.ttf"], type : "font"};
 	this.Kenney_Pixel = null;
 };
@@ -23894,6 +25249,69 @@ kha_netsync_Session.prototype = {
 	}
 	,__class__: kha_netsync_Session
 };
+var states_GameOver = function(score,timeSurvived,sprite,level) {
+	this.level = 0;
+	com_framework_utils_State.call(this);
+	this.level = level;
+	this.score = score;
+	this.timeSurvived = timeSurvived;
+	this.sprite = sprite;
+};
+$hxClasses["states.GameOver"] = states_GameOver;
+states_GameOver.__name__ = "states.GameOver";
+states_GameOver.__super__ = com_framework_utils_State;
+states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
+	load: function(resources) {
+		var atlas = new com_loading_basicResources_JoinAtlas(1024,1024);
+		atlas.add(new com_loading_basicResources_ImageLoader("gameOver"));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
+		atlas.add(new com_loading_basicResources_FontLoader("Kenney_Pixel",24));
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
+		resources.add(atlas);
+	}
+	,init: function() {
+		var image = new com_gEngine_display_Sprite("gameOver");
+		this.simulationLayer = new com_gEngine_display_Layer();
+		this.stage.addChild(this.simulationLayer);
+		this.display = new com_gEngine_display_Sprite(this.sprite);
+		this.display.x = 170;
+		this.display.y = 480.;
+		this.display.scaleX = 3;
+		this.display.scaleY = 3;
+		this.display.timeline.playAnimation("idle",false);
+		this.simulationLayer.addChild(this.display);
+		image.x = com_gEngine_GEngine.virtualWidth * 0.5 - image.width() * 0.5;
+		image.y = 100;
+		this.stage.addChild(image);
+		var scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		var timeDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		var levelDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		scoreDisplay.set_text("You scored " + this.score);
+		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 * 0.66666666666666663 - 7;
+		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 60;
+		scoreDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
+		levelDisplay.set_text("LEVEL " + this.level);
+		levelDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - levelDisplay.width() * 0.5 - 7;
+		levelDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
+		levelDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
+		timeDisplay.set_text("Survived for " + this.timeSurvived);
+		timeDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - timeDisplay.width() * 0.5 * 0.66666666666666663;
+		timeDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 90;
+		timeDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
+		timeDisplay.scaleX = timeDisplay.scaleY = 0.66666666666666663;
+		scoreDisplay.scaleX = scoreDisplay.scaleY = 0.66666666666666663;
+		this.stage.addChild(scoreDisplay);
+		this.stage.addChild(levelDisplay);
+		this.stage.addChild(timeDisplay);
+	}
+	,update: function(dt) {
+		com_framework_utils_State.prototype.update.call(this,dt);
+		if(com_framework_utils_Input.i.isKeyCodePressed(13)) {
+			this.changeState(new states_GameState("0"));
+		}
+	}
+	,__class__: states_GameOver
+});
 var states_GameState = function(room,fromRoom) {
 	com_framework_utils_State.call(this);
 };
@@ -23905,10 +25323,17 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		resources.add(new com_loading_basicResources_DataLoader(kha_Assets.blobs.testRoom_tmxName));
 		var atlas = new com_loading_basicResources_JoinAtlas(2048,2048);
 		atlas.add(new com_loading_basicResources_TilesheetLoader("tiles2",32,32,0));
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
 		atlas.add(new com_loading_basicResources_ImageLoader("salt"));
-		atlas.add(new com_loading_basicResources_ImageLoader("dummy"));
-		atlas.add(new com_loading_basicResources_SparrowLoader("jason","jason_xml"));
-		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
+		atlas.add(new com_loading_basicResources_ImageLoader("yo"));
+		atlas.add(new com_loading_basicResources_ImageLoader("avatar"));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("ghost",60,60,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]),new com_loading_basicResources_Sequence("die",[24,25,26,27,28,28,29,30,31,32,33,34,35,36,37,38,39,40]),new com_loading_basicResources_Sequence("slide",[61,61]),new com_loading_basicResources_Sequence("hurt",[60])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("gate",50,85,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("torch",29,75,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8,9])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("blueFireball",34,25,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("salamander",60,40,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5]),new com_loading_basicResources_Sequence("walk",[6,7,8,9,10,11,12,13]),new com_loading_basicResources_Sequence("attack",[17,18,19,20,21,22,23,24,25,26]),new com_loading_basicResources_Sequence("die",[14,15,16]),new com_loading_basicResources_Sequence("hurt",[14,15])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("fireball",33,25,0,[new com_loading_basicResources_Sequence("idle",[0,1])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
 		atlas.add(new com_loading_basicResources_FontLoader("Kenney_Pixel",24));
 		resources.add(atlas);
 	}
@@ -23916,12 +25341,30 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		var _gthis = this;
 		this.stageColor(0.5,.5,0.5);
 		this.dialogCollision = new com_collision_platformer_CollisionGroup();
+		this.secretGateCollisions = new com_collision_platformer_CollisionGroup();
+		this.torchCollisions = new com_collision_platformer_CollisionGroup();
+		this.endGateCollisions = new com_collision_platformer_CollisionGroup();
+		GlobalGameData.enemyProyectilesCollisions = new com_collision_platformer_CollisionGroup();
+		if(GlobalGameData.playerProyectilesCollisions == null) {
+			GlobalGameData.playerProyectilesCollisions = new com_collision_platformer_CollisionGroup();
+		}
 		this.simulationLayer = new com_gEngine_display_Layer();
 		this.stage.addChild(this.simulationLayer);
-		this.enemyCollision = new com_collision_platformer_CollisionGroup();
+		this.enemiesCollisions = new com_collision_platformer_CollisionGroup();
+		GlobalGameData.simulationLayer = this.simulationLayer;
+		if(GlobalGameData.player != null) {
+			this.player = GlobalGameData.player;
+			this.player.respawn(250,200,this.simulationLayer);
+		} else {
+			this.player = new gameObjects_Player(250,200,this.simulationLayer);
+			GlobalGameData.player = this.player;
+		}
 		var mayonnaiseMap;
 		this.worldMap = new com_collision_platformer_Tilemap("testRoom_tmx",1);
 		this.worldMap.init(function(layerTilemap,tileLayer) {
+			if(tileLayer.properties.exists("damage")) {
+				return;
+			}
 			if(!tileLayer.properties.exists("noCollision")) {
 				layerTilemap.createCollisions(tileLayer);
 			}
@@ -23929,14 +25372,54 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 			mayonnaiseMap = layerTilemap.createDisplay(tileLayer,new com_gEngine_display_Sprite("tiles2"));
 			_gthis.simulationLayer.addChild(mayonnaiseMap);
 		},$bind(this,this.parseMapObjects));
+		this.damageMap = new com_collision_platformer_Tilemap("testRoom_tmx",1);
+		this.damageMap.init(function(layerTilemap1,tileLayer1) {
+			if(!tileLayer1.properties.exists("noCollision")) {
+				layerTilemap1.createCollisions(tileLayer1);
+			}
+			_gthis.simulationLayer.addChild(layerTilemap1.createDisplay(tileLayer1,new com_gEngine_display_Sprite("tiles2")));
+			mayonnaiseMap = layerTilemap1.createDisplay(tileLayer1,new com_gEngine_display_Sprite("tiles2"));
+			_gthis.simulationLayer.addChild(mayonnaiseMap);
+		});
 		this.tray = new helpers_Tray(mayonnaiseMap);
 		this.stage.cameras[0].limits(0,0,this.worldMap.widthIntTiles * 32,this.worldMap.heightInTiles * 32);
-		this.player = new gameObjects_ChivitoBoy(250,200,this.simulationLayer);
-		GlobalGameData.player = this.player;
 		this.addChild(this.player);
 		this.createTouchJoystick();
 		var tmp = com_gEngine_display_Blend.blendDefault();
 		this.stage.cameras[0].postProcess = new com_gEngine_shaders_ShRetro(tmp);
+		this.hudLayer = new com_gEngine_display_StaticLayer();
+		this.stage.addChild(this.hudLayer);
+		this.hpBarTotal = new com_gEngine_helper_RectangleDisplay();
+		this.hpBarTotal.x = 100;
+		this.hpBarTotal.y = com_gEngine_GEngine.virtualHeight * 0.05;
+		this.hpBarTotal.scaleX = 300;
+		this.hpBarTotal.scaleY = 25;
+		this.hudLayer.addChild(this.hpBarTotal);
+		this.currentHpBar = new com_gEngine_helper_RectangleDisplay();
+		this.currentHpBar.x = 102;
+		this.currentHpBar.y = com_gEngine_GEngine.virtualHeight * 0.05 + 2;
+		this.currentHpBar.scaleX = 296;
+		this.currentHpBar.scaleY = 21;
+		this.currentHpBar.setColor(255,0,0);
+		this.hudLayer.addChild(this.currentHpBar);
+		var avatar = new com_gEngine_display_Sprite("avatar");
+		avatar.set_smooth(true);
+		avatar.x = this.hpBarTotal.x - avatar.width() * 3;
+		avatar.y = this.hpBarTotal.y - avatar.height();
+		avatar.scaleX = avatar.scaleY = 3;
+		this.hudLayer.addChild(avatar);
+		this.scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.scoreDisplay.x = this.hpBarTotal.x + 35;
+		this.scoreDisplay.y = this.hpBarTotal.y + this.hpBarTotal.scaleY + 5;
+		this.scoreDisplay.scaleX = this.scoreDisplay.scaleY = 0.5;
+		this.scoreDisplay.set_text("Score: " + GlobalGameData.score);
+		this.hudLayer.addChild(this.scoreDisplay);
+		var continues = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		continues.x = this.hpBarTotal.x - 10;
+		continues.y = this.hpBarTotal.y + this.hpBarTotal.scaleY + 5;
+		continues.scaleX = continues.scaleY = 0.5;
+		continues.set_text("x" + GlobalGameData.continues);
+		this.hudLayer.addChild(continues);
 	}
 	,createTouchJoystick: function() {
 		this.touchJoystick = new com_framework_utils_VirtualGamepad();
@@ -23958,13 +25441,29 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 				this.dialogCollision.add(dialog.collider);
 				this.addChild(dialog);
 			}
-			if(object.type == "enemy") {
-				var json = new gameObjects_Jason(this.simulationLayer,this.enemyCollision,object.x,object.y);
-				this.addChild(json);
+			if(object.type == "ghost") {
+				var ghost = new gameObjects_enemyMinions_Ghost(this.simulationLayer,this.enemiesCollisions,object.x,object.y);
+				this.addChild(ghost);
+			}
+			if(object.type == "salamander") {
+				var salamander = new gameObjects_enemyMinions_Salamander(this.simulationLayer,this.enemiesCollisions,object.x,object.y,GlobalGameData.enemyProyectilesCollisions);
+				this.addChild(salamander);
+			}
+			if(object.type == "endGate") {
+				var endGate = new gameObjects_EndGate(this.simulationLayer,this.endGateCollisions,object.x,object.y);
+				this.addChild(endGate);
+			}
+			if(object.type == "gate") {
+				var gate = new gameObjects_Gate(this.simulationLayer,this.secretGateCollisions,object.x,object.y,parseFloat(object.properties.getString("destinyX")),parseFloat(object.properties.getString("destinyY")));
+				this.addChild(gate);
+			}
+			if(object.type == "torch") {
+				var torch = new gameObjects_Torch(this.simulationLayer,this.torchCollisions,object.x,object.y);
+				this.addChild(torch);
 			}
 			break;
 		case 1:
-			var sprite = new com_gEngine_display_Sprite("salt");
+			var sprite = new com_gEngine_display_Sprite(object.properties.getString("spriteName"));
 			sprite.set_smooth(false);
 			sprite.x = object.x;
 			sprite.y = object.y - sprite.height();
@@ -23972,6 +25471,9 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 			sprite.scaleX = object.width / sprite.width();
 			sprite.scaleY = object.height / sprite.height();
 			sprite.set_rotation(object.rotation * Math.PI / 180);
+			if(object.flippedHorizontally) {
+				sprite.scaleX = -sprite.scaleX;
+			}
 			this.simulationLayer.addChild(sprite);
 			break;
 		default:
@@ -23980,11 +25482,31 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
 		this.stage.cameras[0].scale = 2;
+		this.scoreDisplay.set_text("Score: " + GlobalGameData.score);
+		this.currentHpBar.scaleX = this.player.currentHp * 296 / this.player.maxHp;
+		if(this.currentHpBar.scaleX <= 0) {
+			this.currentHpBar.scaleX = 0;
+		}
 		com_collision_platformer_CollisionEngine.collide(this.player.collision,this.worldMap.collision);
-		com_collision_platformer_CollisionEngine.collide(this.enemyCollision,this.worldMap.collision);
+		com_collision_platformer_CollisionEngine.collide(this.enemiesCollisions,this.worldMap.collision);
+		com_collision_platformer_CollisionEngine.collide(this.torchCollisions,this.worldMap.collision);
+		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.damageMap.collision,$bind(this,this.playerVsDamage));
+		if(this.secretGateCollisions != null) {
+			com_collision_platformer_CollisionEngine.collide(this.secretGateCollisions,this.worldMap.collision);
+		}
+		if(this.endGateCollisions != null) {
+			com_collision_platformer_CollisionEngine.collide(this.endGateCollisions,this.worldMap.collision);
+		}
+		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.enemiesCollisions,$bind(this,this.playerVsEnemy));
+		this.secretGateCollisions.overlap(this.player.collision,$bind(this,this.playerVsScertGate));
+		this.torchCollisions.overlap(this.player.collision,$bind(this,this.playerVsTorch));
+		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.enemyProyectilesCollisions,this.enemiesCollisions);
+		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.playerProyectilesCollisions,this.enemiesCollisions,$bind(this,this.proyectilesVsEnemy));
+		GlobalGameData.enemyProyectilesCollisions.overlap(this.player.collision,$bind(this,this.enemyProyectileVsPlayer));
 		com_collision_platformer_CollisionEngine.overlap(this.dialogCollision,this.player.collision,$bind(this,this.dialogVsPlayer));
-		com_collision_platformer_CollisionEngine.overlap(this.player.hitCollision,this.dialogCollision);
-		com_collision_platformer_CollisionEngine.collide(this.player.hitCollision,this.enemyCollision,$bind(this,this.enemyVsPlayerHit));
+		if(this.player.hitCollision != null) {
+			com_collision_platformer_CollisionEngine.collide(this.player.hitCollision,this.enemiesCollisions,$bind(this,this.enemyVsPlayerHit));
+		}
 		this.stage.cameras[0].setTarget(this.player.collision.x,this.player.collision.y);
 		this.tray.setContactPosition(this.player.collision.x + this.player.collision.width / 2,this.player.collision.y + this.player.collision.height + 1,8);
 		this.tray.setContactPosition(this.player.collision.x + this.player.collision.width + 1,this.player.collision.y + this.player.collision.height / 2,2);
@@ -23994,10 +25516,43 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		var dialog = dialogCollision.userData;
 		dialog.showText(this.simulationLayer);
 	}
-	,enemyVsPlayerHit: function(enemyCollision,hitCollision) {
-		haxe_Log.trace("funcion called",{ fileName : "states/GameState.hx", lineNumber : 169, className : "states.GameState", methodName : "enemyVsPlayerHit"});
-		var enemy = enemyCollision.userData;
-		enemy.damage();
+	,playerVsTorch: function(torchCollision,playerCollision) {
+		this.player.addEffect(new gameObjects_effects_RangeAttack(this.player));
+		var torch = torchCollision.userData;
+		torch.die();
+	}
+	,playerVsEnemy: function(enemiesCollisions,playerCollision) {
+		var enemy = enemiesCollisions.userData;
+		this.player.damage(enemy.get_hitDamage());
+		if(this.player.currentHp <= 0) {
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+		}
+	}
+	,playerVsDamage: function(enemiesCollisions,playerCollision) {
+		this.player.damage(this.player.maxHp);
+		if(this.player.currentHp <= 0) {
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+		}
+	}
+	,playerVsScertGate: function(secretGate,playerCollision) {
+		var secretGate1 = secretGate.userData;
+		this.player.transport(secretGate1.destinyX,secretGate1.destinyY);
+	}
+	,enemyVsPlayerHit: function(enemiesCollisions,hitCollision) {
+		var enemy = enemiesCollisions.userData;
+		enemy.damage(this.player.get_hitDamage());
+	}
+	,proyectilesVsEnemy: function(proyectileCollision,enemiesCollisions) {
+		var proyectile = proyectileCollision.userData;
+		var enemy = enemiesCollisions.userData;
+		enemy.damage(proyectile.get_hitDamage());
+	}
+	,enemyProyectileVsPlayer: function(aProyectile,aPlayer) {
+		var proyectile = aProyectile.userData;
+		this.player.damage(proyectile.get_hitDamage());
+		if(this.player.currentHp <= 0) {
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+		}
 	}
 	,draw: function(framebuffer) {
 		com_framework_utils_State.prototype.draw.call(this,framebuffer);
@@ -24032,6 +25587,10 @@ Object.defineProperty(js__$Boot_HaxeError.prototype,"message",{ get : function()
 	return String(this.val);
 }});
 js_Boot.__toStr = ({ }).toString;
+GlobalGameData.gravity = 2000;
+GlobalGameData.score = 0;
+GlobalGameData.continues = 3;
+GlobalGameData.level = 0;
 Xml.Element = 0;
 Xml.PCData = 1;
 Xml.CData = 2;
