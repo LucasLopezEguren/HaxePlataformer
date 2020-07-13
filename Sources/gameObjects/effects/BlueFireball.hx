@@ -62,7 +62,7 @@ class BlueFireball extends Entity {
 		display.scaleX = dirX * -(1/3) * 2;
 		display.scaleY = 1/3 * 2;
 		collision.width = display.width() * 2 / 3;
-		collision.height = display.height() * 2 / 3;
+		collision.height = display.height() * 2 / 3 + 5;
 		this.dirX = dirX;
 		currentTime = 0;
 		collision.x = x;

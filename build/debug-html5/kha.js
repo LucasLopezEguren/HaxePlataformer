@@ -35,6 +35,28 @@ EReg.prototype = {
 var GlobalGameData = function() { };
 $hxClasses["GlobalGameData"] = GlobalGameData;
 GlobalGameData.__name__ = "GlobalGameData";
+GlobalGameData.levelCompleted = function() {
+	GlobalGameData.level++;
+};
+GlobalGameData.soundControllWithoutIcon = function() {
+	if(com_framework_utils_Input.i.isKeyCodePressed(77)) {
+		if(com_soundLib_SoundManager.musicMuted) {
+			com_soundLib_SoundManager.unMuteMusic();
+			com_soundLib_SoundManager.unMuteSound();
+		} else {
+			com_soundLib_SoundManager.muteMusic();
+			com_soundLib_SoundManager.muteSound();
+		}
+	}
+};
+GlobalGameData.destroy = function() {
+	GlobalGameData.continues = 3;
+	GlobalGameData.level = 1;
+	GlobalGameData.score = 0;
+	GlobalGameData.player = null;
+	GlobalGameData.simulationLayer = null;
+	GlobalGameData.camera = null;
+};
 var HxOverrides = function() { };
 $hxClasses["HxOverrides"] = HxOverrides;
 HxOverrides.__name__ = "HxOverrides";
@@ -101,7 +123,7 @@ Main.main = function() {
 	var windowsOptions = new kha_WindowOptions("clase3",0,0,1280,720,null,true,1,0);
 	var frameBufferOptions = new kha_FramebufferOptions(60,true,32,16,8,0);
 	kha_System.start(new kha_SystemOptions("clase3",1280,720,windowsOptions,frameBufferOptions),function(w) {
-		new com_framework_Simulation(states_GameState,1280,720,1,0);
+		new com_framework_Simulation(states_IntroScreen,1280,720,1,0);
 	});
 };
 Math.__name__ = "Math";
@@ -596,7 +618,7 @@ var cinematic_Dialog = function(text,x,y,width,height) {
 	this.collider.userData = this;
 	this.collider.width = width;
 	this.collider.height = height;
-	this.displayText = new com_gEngine_display_Text("Kenney_Pixel");
+	this.displayText = new com_gEngine_display_Text(kha_Assets.fonts.Kenney_PixelName);
 	this.displayText.set_text(text);
 	this.displayText.x = x;
 	this.displayText.y = y;
@@ -1581,6 +1603,9 @@ com_framework_utils_Input.prototype = {
 	}
 	,isKeyCodePressed: function(keyCode) {
 		return this.keysPressed.indexOf(keyCode) != -1;
+	}
+	,isMousePressed: function() {
+		return this.mousePressed;
 	}
 	,__class__: com_framework_utils_Input
 };
@@ -5365,22 +5390,7 @@ $hxClasses["com.gEngine.display.extra.TileMapDisplay"] = com_gEngine_display_ext
 com_gEngine_display_extra_TileMapDisplay.__name__ = "com.gEngine.display.extra.TileMapDisplay";
 com_gEngine_display_extra_TileMapDisplay.__super__ = com_gEngine_display_Layer;
 com_gEngine_display_extra_TileMapDisplay.prototype = $extend(com_gEngine_display_Layer.prototype,{
-	getTile: function(indexX,indexY) {
-		return this.tiles[indexX + this.widthInTiles * indexY];
-	}
-	,setTile: function(indexX,indexY,value,flipX,flipY,rotate) {
-		if(rotate == null) {
-			rotate = false;
-		}
-		if(flipY == null) {
-			flipY = false;
-		}
-		if(flipX == null) {
-			flipX = false;
-		}
-		this.setTile2(indexX + this.widthInTiles * indexY,value,flipX,flipY);
-	}
-	,setTile2: function(index,value,flipX,flipY,rotate) {
+	setTile2: function(index,value,flipX,flipY,rotate) {
 		if(rotate == null) {
 			rotate = false;
 		}
@@ -7157,29 +7167,6 @@ com_gEngine_shaders_ShRender.__super__ = com_gEngine_painters_Painter;
 com_gEngine_shaders_ShRender.prototype = $extend(com_gEngine_painters_Painter.prototype,{
 	__class__: com_gEngine_shaders_ShRender
 });
-var com_gEngine_shaders_ShRetro = function(blend) {
-	this.time = 0;
-	com_gEngine_painters_Painter.call(this,true,blend);
-};
-$hxClasses["com.gEngine.shaders.ShRetro"] = com_gEngine_shaders_ShRetro;
-com_gEngine_shaders_ShRetro.__name__ = "com.gEngine.shaders.ShRetro";
-com_gEngine_shaders_ShRetro.__super__ = com_gEngine_painters_Painter;
-com_gEngine_shaders_ShRetro.prototype = $extend(com_gEngine_painters_Painter.prototype,{
-	getConstantLocations: function(pipeline) {
-		com_gEngine_painters_Painter.prototype.getConstantLocations.call(this,pipeline);
-		this.mTimer = pipeline.getConstantLocation("time");
-	}
-	,setShaders: function(pipeline) {
-		pipeline.vertexShader = kha_Shaders.simpleTime_vert;
-		pipeline.fragmentShader = kha_Shaders.rgbSplit_frag;
-	}
-	,setParameter: function(g) {
-		this.time += com_TimeManager.delta * 5;
-		com_gEngine_painters_Painter.prototype.setParameter.call(this,g);
-		g.setFloat(this.mTimer,this.time);
-	}
-	,__class__: com_gEngine_shaders_ShRetro
-});
 var com_gEngine_shaders_ShRgbSplit = function(blend) {
 	this.spreadY = 2;
 	this.spreadX = 2;
@@ -8116,6 +8103,25 @@ com_soundLib_SoundManager.__name__ = "com.soundLib.SoundManager";
 com_soundLib_SoundManager.init = function() {
 	com_soundLib_SoundManager.map = new haxe_ds_StringMap();
 	com_soundLib_SoundManager.initied = true;
+};
+com_soundLib_SoundManager.muteSound = function() {
+	com_soundLib_SoundManager.soundMuted = true;
+};
+com_soundLib_SoundManager.muteMusic = function() {
+	com_soundLib_SoundManager.musicMuted = true;
+	if(com_soundLib_SoundManager.music != null) {
+		com_soundLib_SoundManager.musicPosition = com_soundLib_SoundManager.music.get_position();
+		com_soundLib_SoundManager.music.pause();
+	}
+};
+com_soundLib_SoundManager.unMuteSound = function() {
+	com_soundLib_SoundManager.soundMuted = false;
+};
+com_soundLib_SoundManager.unMuteMusic = function() {
+	com_soundLib_SoundManager.musicMuted = false;
+	if(com_soundLib_SoundManager.music != null) {
+		com_soundLib_SoundManager.music.play();
+	}
 };
 com_soundLib_SoundManager.reset = function() {
 	com_soundLib_SoundManager.map = new haxe_ds_StringMap();
@@ -9175,44 +9181,6 @@ format_tmx_Tools.applyObjectTypeTemplate = function(obj,ot) {
 		}
 	}
 };
-var gameObjects_Effect = function(player) {
-	this.isAcumulative = true;
-	com_framework_utils_Entity.call(this);
-	this.player = player;
-	player.addEffect(this);
-};
-$hxClasses["gameObjects.Effect"] = gameObjects_Effect;
-gameObjects_Effect.__name__ = "gameObjects.Effect";
-gameObjects_Effect.__super__ = com_framework_utils_Entity;
-gameObjects_Effect.prototype = $extend(com_framework_utils_Entity.prototype,{
-	effect: function(dt) {
-	}
-	,__class__: gameObjects_Effect
-});
-var gameObjects_EndGate = function(layer,collisions,x,y) {
-	com_framework_utils_Entity.call(this);
-	this.display = new com_gEngine_display_Sprite("gate");
-	this.display.timeline.playAnimation("idle");
-	this.display.colorAdd(0.75,0,0,0);
-	this.display.colorMultiplication(0,0.6,0.6,1);
-	this.collision = new com_collision_platformer_CollisionBox();
-	this.collisionGroup = collisions;
-	this.collision.userData = this;
-	var tmp = this.display.width();
-	this.collision.width = tmp * 0.5;
-	this.collision.height = this.display.height();
-	collisions.add(this.collision);
-	this.display.x = this.collision.x = x;
-	this.display.y = this.collision.y = y;
-	this.display.offsetX = -this.display.width() * 0.25;
-	layer.addChild(this.display);
-};
-$hxClasses["gameObjects.EndGate"] = gameObjects_EndGate;
-gameObjects_EndGate.__name__ = "gameObjects.EndGate";
-gameObjects_EndGate.__super__ = com_framework_utils_Entity;
-gameObjects_EndGate.prototype = $extend(com_framework_utils_Entity.prototype,{
-	__class__: gameObjects_EndGate
-});
 var gameObjects_EnemyMinion = function(layer,collisions,x,y) {
 	this.lastDamageReceived = 0;
 	this.disapearTime = 2;
@@ -9303,6 +9271,184 @@ gameObjects_EnemyMinion.prototype = $extend(com_framework_utils_Entity.prototype
 		}
 	}
 	,__class__: gameObjects_EnemyMinion
+});
+var gameObjects_Boss = function(layer,collisions,endGateCollision,x,y) {
+	this.MAX_SPEED = 200;
+	gameObjects_EnemyMinion.call(this,layer,collisions,x,y);
+	this.hitDamage = 10;
+	this.agressionRange = 200;
+	this.endGateCollision = endGateCollision;
+	this.simulationlayer = layer;
+	this.scorePoints = this.currentHp = this.hpMax = 50;
+	this.display = new com_gEngine_display_Sprite("ghost");
+	layer.addChild(this.display);
+	this.hitTimes = Math.ceil(Math.random() * 3);
+	this.display.timeline.frameRate = 0.04;
+	this.display.timeline.playAnimation("idle");
+	this.display.offsetX = -this.display.width() / 6;
+	this.display.offsetY = -this.display.height() * 0.25;
+	var tmp = this.display.width();
+	this.display.pivotX = tmp * 0.25;
+	this.display.offsetY = -this.display.height() / 3;
+	this.display.set_smooth(false);
+	var tmp1 = this.display.width();
+	this.collision.width = tmp1 / 3;
+	var tmp2 = this.display.height();
+	this.collision.height = tmp2 / 3;
+	if(this.hitTimes == 1) {
+		this.display.colorMultiplication(1,0,1,1);
+	} else {
+		this.display.colorMultiplication(1,1,1,1);
+	}
+};
+$hxClasses["gameObjects.Boss"] = gameObjects_Boss;
+gameObjects_Boss.__name__ = "gameObjects.Boss";
+gameObjects_Boss.__super__ = gameObjects_EnemyMinion;
+gameObjects_Boss.prototype = $extend(gameObjects_EnemyMinion.prototype,{
+	get_hitDamage: function() {
+		if(!this.stunned && !this.target.invulerable && !this.target.isDead()) {
+			this.hitTimes++;
+			this.hitTimes %= 3;
+			if(this.hitTimes == 1) {
+				this.target.addEffect(new gameObjects_effects_Confusion(this.target));
+			}
+		}
+		return gameObjects_EnemyMinion.prototype.get_hitDamage.call(this);
+	}
+	,update: function(dt) {
+		gameObjects_EnemyMinion.prototype.update.call(this,dt);
+		if(this.hitTimes == 0) {
+			this.display.colorMultiplication(1,0,1,1);
+		} else {
+			this.display.colorMultiplication(1,1,1,1);
+		}
+	}
+	,aggresiveStance: function(dt) {
+		var x = this.target.get_x() - (this.collision.x + this.collision.width * 0.5);
+		var y = this.target.get_y() - (this.collision.y + this.collision.height * 1.5);
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		var dir_x = x;
+		var dir_y = y;
+		if(Math.abs(dir_x) < 10) {
+			dir_x = 0;
+		}
+		if(Math.abs(dir_y) < 10) {
+			dir_y = 0;
+		}
+		var x1 = dir_x;
+		var y1 = dir_y;
+		if(y1 == null) {
+			y1 = 0;
+		}
+		if(x1 == null) {
+			x1 = 0;
+		}
+		var v_x = x1;
+		var v_y = y1;
+		var currentLength = Math.sqrt(v_x * v_x + v_y * v_y);
+		if(currentLength != 0) {
+			var mul = 1 / currentLength;
+			v_x *= mul;
+			v_y *= mul;
+		}
+		dir_x = v_x;
+		dir_y = v_y;
+		var value = this.MAX_SPEED;
+		var x2 = dir_x * value;
+		var y2 = dir_y * value;
+		if(y2 == null) {
+			y2 = 0;
+		}
+		if(x2 == null) {
+			x2 = 0;
+		}
+		var v_x1 = x2;
+		var v_y1 = y2;
+		dir_x = v_x1;
+		dir_y = v_y1;
+		this.collision.accelerationX = dir_x;
+		this.collision.accelerationY = dir_y;
+		this.collision.maxVelocityX = this.collision.maxVelocityX = 100;
+	}
+	,passiveStance: function(dt) {
+		this.collision.velocityX = 0;
+		this.collision.velocityY = 0;
+	}
+	,die: function() {
+		gameObjects_EnemyMinion.prototype.die.call(this);
+		var endGate = new gameObjects_EndGate(this.simulationlayer,this.endGateCollision,gameObjects_Boss.gateOutX,gameObjects_Boss.gateOutY);
+		this.addChild(endGate);
+	}
+	,render: function() {
+		this.display.x = this.collision.x + this.collision.width * 0.5;
+		this.display.y = this.collision.y;
+		if(this.display.timeline.currentAnimation == "die") {
+			return;
+		}
+		if(this.stunned) {
+			return;
+		}
+		if(Math.abs(this.collision.velocityX) > Math.abs(this.collision.velocityY)) {
+			if(this.collision.accelerationX > 0) {
+				if(this.collision.velocityX < 0) {
+					this.display.timeline.playAnimation("slide");
+				} else {
+					this.display.scaleX = -1;
+					this.display.timeline.playAnimation("idle");
+				}
+			} else if(this.collision.velocityX > 0) {
+				this.display.timeline.playAnimation("slide");
+			} else {
+				this.display.scaleX = 1;
+				this.display.timeline.playAnimation("idle");
+			}
+		}
+		gameObjects_EnemyMinion.prototype.render.call(this);
+	}
+	,__class__: gameObjects_Boss
+});
+var gameObjects_Effect = function(player) {
+	this.isAcumulative = true;
+	com_framework_utils_Entity.call(this);
+	this.player = player;
+	player.addEffect(this);
+};
+$hxClasses["gameObjects.Effect"] = gameObjects_Effect;
+gameObjects_Effect.__name__ = "gameObjects.Effect";
+gameObjects_Effect.__super__ = com_framework_utils_Entity;
+gameObjects_Effect.prototype = $extend(com_framework_utils_Entity.prototype,{
+	effect: function(dt) {
+	}
+	,__class__: gameObjects_Effect
+});
+var gameObjects_EndGate = function(layer,collisions,x,y) {
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Sprite("gate");
+	this.display.timeline.playAnimation("idle");
+	this.display.colorAdd(0.75,0,0,0);
+	this.display.colorMultiplication(0,0.6,0.6,1);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collisionGroup = collisions;
+	this.collision.userData = this;
+	var tmp = this.display.width();
+	this.collision.width = tmp * 0.5;
+	this.collision.height = this.display.height();
+	collisions.add(this.collision);
+	this.display.x = this.collision.x = x;
+	this.display.y = this.collision.y = y;
+	this.display.offsetX = -this.display.width() * 0.25;
+	layer.addChild(this.display);
+};
+$hxClasses["gameObjects.EndGate"] = gameObjects_EndGate;
+gameObjects_EndGate.__name__ = "gameObjects.EndGate";
+gameObjects_EndGate.__super__ = com_framework_utils_Entity;
+gameObjects_EndGate.prototype = $extend(com_framework_utils_Entity.prototype,{
+	__class__: gameObjects_EndGate
 });
 var gameObjects_Gate = function(layer,collisions,x,y,destinyX,destinyY) {
 	com_framework_utils_Entity.call(this);
@@ -9558,7 +9704,6 @@ gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
 			this.currentHp -= damageRecieve;
 			if(this.currentHp <= 0) {
 				this.receiveHeavyDamage = true;
-				GlobalGameData.continues -= 1;
 				this.die();
 				return;
 			}
@@ -9904,8 +10049,8 @@ gameObjects_effects_BlueFireball.prototype = $extend(com_framework_utils_Entity.
 		this.display.scaleY = 0.66666666666666663;
 		var tmp = this.display.width() * 2;
 		this.collision.width = tmp / 3;
-		var tmp1 = this.display.height() * 2;
-		this.collision.height = tmp1 / 3;
+		var tmp1 = this.display.height() * 2 / 3;
+		this.collision.height = tmp1 + 5;
 		this.dirX = dirX;
 		this.currentTime = 0;
 		this.collision.x = x;
@@ -12541,68 +12686,6 @@ haxe_zip_InflateImpl.prototype = {
 	}
 	,__class__: haxe_zip_InflateImpl
 };
-var helpers_Tray = function(aMap) {
-	this.mMap = aMap;
-};
-$hxClasses["helpers.Tray"] = helpers_Tray;
-helpers_Tray.__name__ = "helpers.Tray";
-helpers_Tray.prototype = {
-	setContactPosition: function(x,y,direction) {
-		var xIndex = x / 32 | 0;
-		var yIndex = y / 32 | 0;
-		var type = this.mMap.getTile(xIndex,yIndex);
-		if(type != 0) {
-			if((direction & 8) > 0) {
-				switch(type) {
-				case 5:
-					type = 12;
-					break;
-				case 8:
-					type = 11;
-					break;
-				case 9:
-					type = 6;
-					break;
-				case 10:
-					type = 7;
-					break;
-				}
-			} else if((direction & 2) > 0) {
-				switch(type) {
-				case 5:
-					type = 10;
-					break;
-				case 6:
-					type = 11;
-					break;
-				case 9:
-					type = 8;
-					break;
-				case 12:
-					type = 7;
-					break;
-				}
-			} else if((direction & 1) > 0) {
-				switch(type) {
-				case 5:
-					type = 9;
-					break;
-				case 7:
-					type = 11;
-					break;
-				case 10:
-					type = 8;
-					break;
-				case 12:
-					type = 6;
-					break;
-				}
-			}
-			this.mMap.setTile(xIndex,yIndex,type);
-		}
-	}
-	,__class__: helpers_Tray
-};
 var js__$Boot_HaxeError = function(val) {
 	Error.call(this);
 	this.val = val;
@@ -12834,23 +12917,25 @@ js_Boot.__resolveNativeClass = function(name) {
 	return $global[name];
 };
 var kha__$Assets_ImageList = function() {
-	this.yoDescription = { name : "yo", original_height : 504, file_sizes : [2594], original_width : 185, files : ["yo.png"], type : "image"};
+	this.yoDescription = { name : "yo", original_height : 75, file_sizes : [4480], original_width : 28, files : ["yo.png"], type : "image"};
 	this.yo = null;
+	this.victoryDescription = { name : "victory", original_height : 842, file_sizes : [499233], original_width : 1024, files : ["victory.png"], type : "image"};
+	this.victory = null;
 	this.torchDescription = { name : "torch", original_height : 150, file_sizes : [6376], original_width : 145, files : ["torch.png"], type : "image"};
 	this.torch = null;
 	this.tiles2Description = { name : "tiles2", original_height : 128, file_sizes : [1967], original_width : 160, files : ["tiles2.png"], type : "image"};
 	this.tiles2 = null;
-	this.sandDescription = { name : "sand", original_height : 128, file_sizes : [27658], original_width : 160, files : ["sand.png"], type : "image"};
-	this.sand = null;
-	this.saltDescription = { name : "salt", original_height : 36, file_sizes : [524], original_width : 29, files : ["salt.png"], type : "image"};
-	this.salt = null;
+	this.skyBackgroundDescription = { name : "skyBackground", original_height : 800, file_sizes : [230111], original_width : 1600, files : ["skyBackground.png"], type : "image"};
+	this.skyBackground = null;
 	this.salamanderDescription = { name : "salamander", original_height : 160, file_sizes : [10351], original_width : 420, files : ["salamander.png"], type : "image"};
 	this.salamander = null;
 	this.logoDescription = { name : "logo", original_height : 149, file_sizes : [25056], original_width : 200, files : ["logo.png"], type : "image"};
+	this.logoName = "logo";
 	this.logo = null;
 	this.heroDescription = { name : "hero", original_height : 300, file_sizes : [45074], original_width : 720, files : ["hero.png"], type : "image"};
 	this.hero = null;
-	this.hellsGateIntroDescription = { name : "hellsGateIntro", original_height : 1700, file_sizes : [1687533], original_width : 2560, files : ["hellsGateIntro.jpg"], type : "image"};
+	this.hellsGateIntroDescription = { name : "hellsGateIntro", original_height : 720, file_sizes : [1253308], original_width : 1280, files : ["hellsGateIntro.png"], type : "image"};
+	this.hellsGateIntroName = "hellsGateIntro";
 	this.hellsGateIntro = null;
 	this.ghostDescription = { name : "ghost", original_height : 420, file_sizes : [29620], original_width : 600, files : ["ghost.png"], type : "image"};
 	this.ghost = null;
@@ -12860,6 +12945,8 @@ var kha__$Assets_ImageList = function() {
 	this.gameOver = null;
 	this.fireballDescription = { name : "fireball", original_height : 25, file_sizes : [994], original_width : 66, files : ["fireball.png"], type : "image"};
 	this.fireball = null;
+	this.caveDescription = { name : "cave", original_height : 800, file_sizes : [605657], original_width : 868, files : ["cave.png"], type : "image"};
+	this.cave = null;
 	this.blueFireballDescription = { name : "blueFireball", original_height : 25, file_sizes : [13162], original_width : 272, files : ["blueFireball.png"], type : "image"};
 	this.blueFireball = null;
 	this.avatarDescription = { name : "avatar", original_height : 21, file_sizes : [658], original_width : 21, files : ["avatar.png"], type : "image"};
@@ -12876,11 +12963,14 @@ kha__$Assets_ImageList.prototype = {
 var kha__$Assets_BlobList = function() {
 	this.yo_tsxDescription = { name : "yo_tsx", file_sizes : [215], files : ["yo.tsx"], type : "blob"};
 	this.yo_tsx = null;
-	this.testRoom_tmxDescription = { name : "testRoom_tmx", file_sizes : [7487], files : ["testRoom.tmx"], type : "blob"};
-	this.testRoom_tmxName = "testRoom_tmx";
-	this.testRoom_tmx = null;
 	this.sand_tsxDescription = { name : "sand_tsx", file_sizes : [228], files : ["sand.tsx"], type : "blob"};
 	this.sand_tsx = null;
+	this.level3_tmxDescription = { name : "level3_tmx", file_sizes : [3907], files : ["level3.tmx"], type : "blob"};
+	this.level3_tmx = null;
+	this.level2_tmxDescription = { name : "level2_tmx", file_sizes : [8761], files : ["level2.tmx"], type : "blob"};
+	this.level2_tmx = null;
+	this.level1_tmxDescription = { name : "level1_tmx", file_sizes : [7789], files : ["level1.tmx"], type : "blob"};
+	this.level1_tmx = null;
 };
 $hxClasses["kha._Assets.BlobList"] = kha__$Assets_BlobList;
 kha__$Assets_BlobList.__name__ = "kha._Assets.BlobList";
@@ -12897,6 +12987,7 @@ var kha__$Assets_FontList = function() {
 	this.PixelOperator8_BoldName = "PixelOperator8_Bold";
 	this.PixelOperator8_Bold = null;
 	this.Kenney_PixelDescription = { name : "Kenney_Pixel", file_sizes : [28276], files : ["Kenney Pixel.ttf"], type : "font"};
+	this.Kenney_PixelName = "Kenney_Pixel";
 	this.Kenney_Pixel = null;
 };
 $hxClasses["kha._Assets.FontList"] = kha__$Assets_FontList;
@@ -15624,6 +15715,23 @@ kha_audio2_Audio1.mix = function(samplesBox,buffer) {
 		}
 	}
 };
+kha_audio2_Audio1._playAgain = function(channel) {
+	var _g = 0;
+	while(_g < 32) {
+		var i = _g++;
+		if(kha_audio2_Audio1.soundChannels[i] == channel) {
+			kha_audio2_Audio1.soundChannels[i] = null;
+		}
+	}
+	var _g1 = 0;
+	while(_g1 < 32) {
+		var i1 = _g1++;
+		if(kha_audio2_Audio1.soundChannels[i1] == null || kha_audio2_Audio1.soundChannels[i1].get_finished() || kha_audio2_Audio1.soundChannels[i1] == channel) {
+			kha_audio2_Audio1.soundChannels[i1] = channel;
+			break;
+		}
+	}
+};
 var kha_audio2_AudioChannel = function(looping) {
 	this.looping = false;
 	this.stopped = false;
@@ -15665,6 +15773,17 @@ kha_audio2_AudioChannel.prototype = {
 			}
 		}
 		while(requestedSamplesIndex < requestedLength) requestedSamples[requestedSamplesIndex++] = 0;
+	}
+	,play: function() {
+		this.paused = false;
+		this.stopped = false;
+		kha_audio2_Audio1._playAgain(this);
+	}
+	,pause: function() {
+		this.paused = true;
+	}
+	,get_position: function() {
+		return this.myPosition / kha_audio2_Audio.samplesPerSecond / 2;
 	}
 	,get_volume: function() {
 		return this.myVolume;
@@ -15722,6 +15841,15 @@ kha_audio2_StreamChannel.prototype = {
 			}
 		}
 	}
+	,play: function() {
+		this.paused = false;
+	}
+	,pause: function() {
+		this.paused = true;
+	}
+	,get_position: function() {
+		return this.reader.get_currentMillisecond() / 1000.0;
+	}
 	,get_volume: function() {
 		return this.myVolume;
 	}
@@ -15761,8 +15889,32 @@ kha_audio2_VirtualStreamChannel.prototype = {
 		}
 		this.lastTickTime = now;
 	}
+	,play: function() {
+		if(kha_SystemImpl.mobileAudioPlaying) {
+			this.aeChannel.play();
+		} else {
+			this.updatePosition();
+			this.mode = 2;
+		}
+	}
+	,pause: function() {
+		if(kha_SystemImpl.mobileAudioPlaying) {
+			this.aeChannel.pause();
+		} else {
+			this.updatePosition();
+			this.mode = 1;
+		}
+	}
 	,get_length: function() {
 		return this.aeChannel.get_length();
+	}
+	,get_position: function() {
+		if(kha_SystemImpl.mobileAudioPlaying) {
+			return this.aeChannel.get_position();
+		} else {
+			this.updatePosition();
+			return this.lastPosition;
+		}
 	}
 	,__class__: kha_audio2_VirtualStreamChannel
 };
@@ -24275,12 +24427,22 @@ kha_js_AEAudioChannel.prototype = {
 		this.stopped = false;
 		this.element.play();
 	}
+	,pause: function() {
+		try {
+			this.element.pause();
+		} catch( e ) {
+			haxe_Log.trace(((e) instanceof js__$Boot_HaxeError) ? e.val : e,{ fileName : "kha/js/AEAudioChannel.hx", lineNumber : 26, className : "kha.js.AEAudioChannel", methodName : "pause"});
+		}
+	}
 	,get_length: function() {
 		if(isFinite(this.element.duration)) {
 			return this.element.duration;
 		} else {
 			return Infinity;
 		}
+	}
+	,get_position: function() {
+		return this.element.currentTime;
 	}
 	,set_position: function(value) {
 		return this.element.currentTime = value;
@@ -24547,6 +24709,28 @@ kha_js_MobileWebAudioChannel.prototype = {
 		} else {
 			this.startTime = kha_js_MobileWebAudio._context.currentTime;
 			this.source.start();
+		}
+	}
+	,pause: function() {
+		var wasStopped = this.paused || this.stopped;
+		this.pauseTime = kha_js_MobileWebAudio._context.currentTime - this.startTime;
+		this.paused = true;
+		if(wasStopped) {
+			return;
+		}
+		this.source.stop();
+	}
+	,get_length: function() {
+		return this.source.buffer.duration;
+	}
+	,get_position: function() {
+		if(this.stopped) {
+			return this.get_length();
+		}
+		if(this.paused) {
+			return this.pauseTime;
+		} else {
+			return kha_js_MobileWebAudio._context.currentTime - this.startTime;
 		}
 	}
 	,__class__: kha_js_MobileWebAudioChannel
@@ -24985,9 +25169,6 @@ kha_js_graphics4_Graphics.prototype = {
 		this.colorMaskBlue = pipe.colorWriteMasksBlue[0];
 		this.colorMaskAlpha = pipe.colorWriteMasksAlpha[0];
 	}
-	,setFloat: function(location,value) {
-		kha_SystemImpl.gl.uniform1f((js_Boot.__cast(location , kha_js_graphics4_ConstantLocation)).value,value);
-	}
 	,setFloat2: function(location,value1,value2) {
 		kha_SystemImpl.gl.uniform2f((js_Boot.__cast(location , kha_js_graphics4_ConstantLocation)).value,value1,value2);
 	}
@@ -25249,13 +25430,46 @@ kha_netsync_Session.prototype = {
 	}
 	,__class__: kha_netsync_Session
 };
-var states_GameOver = function(score,timeSurvived,sprite,level) {
+var states_Credits = function() {
+	com_framework_utils_State.call(this);
+};
+$hxClasses["states.Credits"] = states_Credits;
+states_Credits.__name__ = "states.Credits";
+states_Credits.__super__ = com_framework_utils_State;
+states_Credits.prototype = $extend(com_framework_utils_State.prototype,{
+	load: function(resources) {
+		var atlas = new com_loading_basicResources_JoinAtlas(1024,1024);
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
+		resources.add(atlas);
+	}
+	,init: function() {
+		this.credits = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.credits.set_text("\n" + "\n" + "\n" + "Finally you could escape from hell" + "\n" + "\n" + "\n" + "CONGRATULATIONS YOU SCORED " + GlobalGameData.score + "\n" + "\n" + "\n" + "\n Game developer: Lucas Lopez" + "\n" + "\n" + "\n" + "\n Game desaigner: Lucas Lopez" + "\n" + "\n" + "\n" + "\n Level design: Lucas Lopez " + "\n" + "\n" + "\n" + "\n Background design: Nathaly Alvez " + "\n" + "\n" + "\n" + "\n Sprite design: Gabriel Molfino, " + "\n" + "\n Joaquin Bello" + "\n" + "\n Planet ceuntari, Riot," + "\n" + "\n Josito, Z-studios, DMCA" + "\n" + "\n" + "\n" + "\n Sprite editor: Lucas Lopez" + "\n" + "\n" + "\n" + "\n Thank you for playing my game!");
+		var tmp = com_gEngine_GEngine.virtualWidth / 2;
+		var tmp1 = this.credits.width() / 2;
+		this.credits.x = tmp - tmp1;
+		this.credits.y = com_gEngine_GEngine.virtualHeight;
+		this.stage.addChild(this.credits);
+	}
+	,update: function(dt) {
+		this.credits.y -= 1;
+		com_framework_utils_State.prototype.update.call(this,dt);
+		if(com_framework_utils_Input.i.isKeyCodePressed(13) || this.credits.y < -states_Credits.credistHeight) {
+			GlobalGameData.destroy();
+			this.changeState(new states_IntroScreen());
+		}
+	}
+	,__class__: states_Credits
+});
+var states_GameOver = function(score,sprite,level) {
+	this.timeLimit = 1;
+	this.timeCounter = 0;
 	this.level = 0;
 	com_framework_utils_State.call(this);
 	this.level = level;
 	this.score = score;
-	this.timeSurvived = timeSurvived;
 	this.sprite = sprite;
+	GlobalGameData.continues -= 1;
 };
 $hxClasses["states.GameOver"] = states_GameOver;
 states_GameOver.__name__ = "states.GameOver";
@@ -25264,7 +25478,8 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 	load: function(resources) {
 		var atlas = new com_loading_basicResources_JoinAtlas(1024,1024);
 		atlas.add(new com_loading_basicResources_ImageLoader("gameOver"));
-		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
+		atlas.add(new com_loading_basicResources_ImageLoader("avatar"));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("recover",[28,29,30,31,0]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
 		atlas.add(new com_loading_basicResources_FontLoader("Kenney_Pixel",24));
 		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
 		resources.add(atlas);
@@ -25274,17 +25489,20 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 		this.simulationLayer = new com_gEngine_display_Layer();
 		this.stage.addChild(this.simulationLayer);
 		this.display = new com_gEngine_display_Sprite(this.sprite);
-		this.display.x = 170;
-		this.display.y = 480.;
+		var tmp = com_gEngine_GEngine.virtualWidth * 0.5;
+		var tmp1 = this.display.width() / 2;
+		this.display.x = tmp - tmp1;
+		var tmp2 = com_gEngine_GEngine.virtualHeight * 0.75;
+		var tmp3 = this.display.height();
+		this.display.y = tmp2 - tmp3;
 		this.display.scaleX = 3;
 		this.display.scaleY = 3;
 		this.display.timeline.playAnimation("idle",false);
 		this.simulationLayer.addChild(this.display);
 		image.x = com_gEngine_GEngine.virtualWidth * 0.5 - image.width() * 0.5;
-		image.y = 100;
+		image.y = 20;
 		this.stage.addChild(image);
 		var scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		var timeDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
 		var levelDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
 		scoreDisplay.set_text("You scored " + this.score);
 		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 * 0.66666666666666663 - 7;
@@ -25294,38 +25512,65 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 		levelDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - levelDisplay.width() * 0.5 - 7;
 		levelDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
 		levelDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
-		timeDisplay.set_text("Survived for " + this.timeSurvived);
-		timeDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - timeDisplay.width() * 0.5 * 0.66666666666666663;
-		timeDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 90;
-		timeDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
-		timeDisplay.scaleX = timeDisplay.scaleY = 0.66666666666666663;
 		scoreDisplay.scaleX = scoreDisplay.scaleY = 0.66666666666666663;
+		var avatar = new com_gEngine_display_Sprite("avatar");
+		avatar.set_smooth(true);
+		avatar.x = image.x + image.width() / 2 - avatar.width() * 3;
+		avatar.y = image.y + image.height() - avatar.width();
+		avatar.scaleX = avatar.scaleY = 3;
+		this.simulationLayer.addChild(avatar);
+		var continues = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		continues.x = avatar.x + avatar.width() * 3;
+		continues.y = image.y + image.height() + 10;
+		continues.scaleX = continues.scaleY = 0.5;
+		continues.set_text("x" + GlobalGameData.continues);
+		this.simulationLayer.addChild(continues);
 		this.stage.addChild(scoreDisplay);
 		this.stage.addChild(levelDisplay);
-		this.stage.addChild(timeDisplay);
+		this.playDeadAnimation();
+	}
+	,playDeadAnimation: function() {
+		this.display.scaleX = 3;
+		this.display.scaleY = 3;
+		this.display.timeline.frameRate = 0.1;
+		this.display.timeline.playAnimation("heavyDamage",false);
 	}
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
 		if(com_framework_utils_Input.i.isKeyCodePressed(13)) {
-			this.changeState(new states_GameState("0"));
+			if(GlobalGameData.continues < 0) {
+				GlobalGameData.destroy();
+				this.changeState(new states_IntroScreen());
+			} else {
+				this.display.timeline.playAnimation("recover",false);
+			}
+		}
+		if(this.display.timeline.currentAnimation == "recover" && this.timeCounter >= this.timeLimit) {
+			this.changeState(new states_GameState(GlobalGameData.level + ""));
+		} else if(this.display.timeline.currentAnimation == "recover") {
+			this.timeCounter += dt;
 		}
 	}
 	,__class__: states_GameOver
 });
-var states_GameState = function(room,fromRoom) {
+var states_GameState = function(level,fromRoom) {
 	com_framework_utils_State.call(this);
+	this.level = level;
+	haxe_Log.trace(level,{ fileName : "states/GameState.hx", lineNumber : 70, className : "states.GameState", methodName : "new"});
 };
 $hxClasses["states.GameState"] = states_GameState;
 states_GameState.__name__ = "states.GameState";
 states_GameState.__super__ = com_framework_utils_State;
 states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	load: function(resources) {
-		resources.add(new com_loading_basicResources_DataLoader(kha_Assets.blobs.testRoom_tmxName));
+		resources.add(new com_loading_basicResources_DataLoader("level" + this.level + "_tmx"));
 		var atlas = new com_loading_basicResources_JoinAtlas(2048,2048);
 		atlas.add(new com_loading_basicResources_TilesheetLoader("tiles2",32,32,0));
 		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
-		atlas.add(new com_loading_basicResources_ImageLoader("salt"));
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.Kenney_PixelName,24));
 		atlas.add(new com_loading_basicResources_ImageLoader("yo"));
+		atlas.add(new com_loading_basicResources_ImageLoader("skyBackground"));
+		atlas.add(new com_loading_basicResources_ImageLoader("cave"));
 		atlas.add(new com_loading_basicResources_ImageLoader("avatar"));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("ghost",60,60,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]),new com_loading_basicResources_Sequence("die",[24,25,26,27,28,28,29,30,31,32,33,34,35,36,37,38,39,40]),new com_loading_basicResources_Sequence("slide",[61,61]),new com_loading_basicResources_Sequence("hurt",[60])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("gate",50,85,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8])]));
@@ -25334,7 +25579,6 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("salamander",60,40,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5]),new com_loading_basicResources_Sequence("walk",[6,7,8,9,10,11,12,13]),new com_loading_basicResources_Sequence("attack",[17,18,19,20,21,22,23,24,25,26]),new com_loading_basicResources_Sequence("die",[14,15,16]),new com_loading_basicResources_Sequence("hurt",[14,15])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("fireball",33,25,0,[new com_loading_basicResources_Sequence("idle",[0,1])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
-		atlas.add(new com_loading_basicResources_FontLoader("Kenney_Pixel",24));
 		resources.add(atlas);
 	}
 	,init: function() {
@@ -25354,13 +25598,12 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		GlobalGameData.simulationLayer = this.simulationLayer;
 		if(GlobalGameData.player != null) {
 			this.player = GlobalGameData.player;
-			this.player.respawn(250,200,this.simulationLayer);
+			this.player.respawn(100,100,this.simulationLayer);
 		} else {
-			this.player = new gameObjects_Player(250,200,this.simulationLayer);
+			this.player = new gameObjects_Player(100,100,this.simulationLayer);
 			GlobalGameData.player = this.player;
 		}
-		var mayonnaiseMap;
-		this.worldMap = new com_collision_platformer_Tilemap("testRoom_tmx",1);
+		this.worldMap = new com_collision_platformer_Tilemap("level" + this.level + "_tmx",1);
 		this.worldMap.init(function(layerTilemap,tileLayer) {
 			if(tileLayer.properties.exists("damage")) {
 				return;
@@ -25369,24 +25612,27 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 				layerTilemap.createCollisions(tileLayer);
 			}
 			_gthis.simulationLayer.addChild(layerTilemap.createDisplay(tileLayer,new com_gEngine_display_Sprite("tiles2")));
-			mayonnaiseMap = layerTilemap.createDisplay(tileLayer,new com_gEngine_display_Sprite("tiles2"));
-			_gthis.simulationLayer.addChild(mayonnaiseMap);
 		},$bind(this,this.parseMapObjects));
-		this.damageMap = new com_collision_platformer_Tilemap("testRoom_tmx",1);
+		this.damageMap = new com_collision_platformer_Tilemap("level" + this.level + "_tmx",1);
 		this.damageMap.init(function(layerTilemap1,tileLayer1) {
+			if(!tileLayer1.properties.exists("damage")) {
+				return;
+			}
 			if(!tileLayer1.properties.exists("noCollision")) {
 				layerTilemap1.createCollisions(tileLayer1);
 			}
 			_gthis.simulationLayer.addChild(layerTilemap1.createDisplay(tileLayer1,new com_gEngine_display_Sprite("tiles2")));
-			mayonnaiseMap = layerTilemap1.createDisplay(tileLayer1,new com_gEngine_display_Sprite("tiles2"));
-			_gthis.simulationLayer.addChild(mayonnaiseMap);
 		});
-		this.tray = new helpers_Tray(mayonnaiseMap);
+		if(GlobalGameData.player != null) {
+			this.player = GlobalGameData.player;
+			this.player.respawn(100,100,this.simulationLayer);
+		} else {
+			this.player = new gameObjects_Player(100,100,this.simulationLayer);
+			GlobalGameData.player = this.player;
+		}
 		this.stage.cameras[0].limits(0,0,this.worldMap.widthIntTiles * 32,this.worldMap.heightInTiles * 32);
 		this.addChild(this.player);
 		this.createTouchJoystick();
-		var tmp = com_gEngine_display_Blend.blendDefault();
-		this.stage.cameras[0].postProcess = new com_gEngine_shaders_ShRetro(tmp);
 		this.hudLayer = new com_gEngine_display_StaticLayer();
 		this.stage.addChild(this.hudLayer);
 		this.hpBarTotal = new com_gEngine_helper_RectangleDisplay();
@@ -25408,12 +25654,12 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		avatar.y = this.hpBarTotal.y - avatar.height();
 		avatar.scaleX = avatar.scaleY = 3;
 		this.hudLayer.addChild(avatar);
-		this.scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		this.scoreDisplay.x = this.hpBarTotal.x + 35;
-		this.scoreDisplay.y = this.hpBarTotal.y + this.hpBarTotal.scaleY + 5;
-		this.scoreDisplay.scaleX = this.scoreDisplay.scaleY = 0.5;
-		this.scoreDisplay.set_text("Score: " + GlobalGameData.score);
-		this.hudLayer.addChild(this.scoreDisplay);
+		this.scoreLevelDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.scoreLevelDisplay.x = this.hpBarTotal.x + 35;
+		this.scoreLevelDisplay.y = this.hpBarTotal.y + this.hpBarTotal.scaleY + 5;
+		this.scoreLevelDisplay.scaleX = this.scoreLevelDisplay.scaleY = 0.5;
+		this.scoreLevelDisplay.set_text("Score: " + GlobalGameData.score);
+		this.hudLayer.addChild(this.scoreLevelDisplay);
 		var continues = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
 		continues.x = this.hpBarTotal.x - 10;
 		continues.y = this.hpBarTotal.y + this.hpBarTotal.scaleY + 5;
@@ -25453,6 +25699,10 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 				var endGate = new gameObjects_EndGate(this.simulationLayer,this.endGateCollisions,object.x,object.y);
 				this.addChild(endGate);
 			}
+			if(object.type == "boss") {
+				var endGate1 = new gameObjects_Boss(this.simulationLayer,this.enemiesCollisions,this.endGateCollisions,object.x,object.y);
+				this.addChild(endGate1);
+			}
 			if(object.type == "gate") {
 				var gate = new gameObjects_Gate(this.simulationLayer,this.secretGateCollisions,object.x,object.y,parseFloat(object.properties.getString("destinyX")),parseFloat(object.properties.getString("destinyY")));
 				this.addChild(gate);
@@ -25482,7 +25732,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
 		this.stage.cameras[0].scale = 2;
-		this.scoreDisplay.set_text("Score: " + GlobalGameData.score);
+		this.scoreLevelDisplay.set_text("Score: " + GlobalGameData.score + " - Level: " + GlobalGameData.level);
 		this.currentHpBar.scaleX = this.player.currentHp * 296 / this.player.maxHp;
 		if(this.currentHpBar.scaleX <= 0) {
 			this.currentHpBar.scaleX = 0;
@@ -25499,6 +25749,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		}
 		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.enemiesCollisions,$bind(this,this.playerVsEnemy));
 		this.secretGateCollisions.overlap(this.player.collision,$bind(this,this.playerVsScertGate));
+		this.endGateCollisions.overlap(this.player.collision,$bind(this,this.playerVsEndGate));
 		this.torchCollisions.overlap(this.player.collision,$bind(this,this.playerVsTorch));
 		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.enemyProyectilesCollisions,this.enemiesCollisions);
 		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.playerProyectilesCollisions,this.enemiesCollisions,$bind(this,this.proyectilesVsEnemy));
@@ -25508,9 +25759,6 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 			com_collision_platformer_CollisionEngine.collide(this.player.hitCollision,this.enemiesCollisions,$bind(this,this.enemyVsPlayerHit));
 		}
 		this.stage.cameras[0].setTarget(this.player.collision.x,this.player.collision.y);
-		this.tray.setContactPosition(this.player.collision.x + this.player.collision.width / 2,this.player.collision.y + this.player.collision.height + 1,8);
-		this.tray.setContactPosition(this.player.collision.x + this.player.collision.width + 1,this.player.collision.y + this.player.collision.height / 2,2);
-		this.tray.setContactPosition(this.player.collision.x - 1,this.player.collision.y + this.player.collision.height / 2,1);
 	}
 	,dialogVsPlayer: function(dialogCollision,playerCollision) {
 		var dialog = dialogCollision.userData;
@@ -25525,18 +25773,21 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		var enemy = enemiesCollisions.userData;
 		this.player.damage(enemy.get_hitDamage());
 		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
 		}
 	}
 	,playerVsDamage: function(enemiesCollisions,playerCollision) {
-		this.player.damage(this.player.maxHp);
+		this.player.damage(100);
 		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
 		}
 	}
 	,playerVsScertGate: function(secretGate,playerCollision) {
 		var secretGate1 = secretGate.userData;
 		this.player.transport(secretGate1.destinyX,secretGate1.destinyY);
+	}
+	,playerVsEndGate: function(secretGate,playerCollision) {
+		this.changeState(new states_SuccessScreen());
 	}
 	,enemyVsPlayerHit: function(enemiesCollisions,hitCollision) {
 		var enemy = enemiesCollisions.userData;
@@ -25551,7 +25802,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		var proyectile = aProyectile.userData;
 		this.player.damage(proyectile.get_hitDamage());
 		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"0","hero",GlobalGameData.level));
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
 		}
 	}
 	,draw: function(framebuffer) {
@@ -25564,6 +25815,160 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		this.touchJoystick.destroy();
 	}
 	,__class__: states_GameState
+});
+var states_IntroScreen = function() {
+	this.transcparency = 0;
+	this.more = false;
+	this.changeScreen = false;
+	com_framework_utils_State.call(this);
+};
+$hxClasses["states.IntroScreen"] = states_IntroScreen;
+states_IntroScreen.__name__ = "states.IntroScreen";
+states_IntroScreen.__super__ = com_framework_utils_State;
+states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
+	load: function(resources) {
+		var atlas = new com_loading_basicResources_JoinAtlas(2048,2048);
+		atlas.add(new com_loading_basicResources_ImageLoader(kha_Assets.images.hellsGateIntroName));
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
+		resources.add(new com_loading_basicResources_ImageLoader(kha_Assets.images.logoName));
+		resources.add(atlas);
+	}
+	,init: function() {
+		this.simulationLayer = new com_gEngine_display_Layer();
+		this.stage.addChild(this.simulationLayer);
+		this.background = new com_gEngine_display_Sprite(kha_Assets.images.hellsGateIntroName);
+		this.background.x = this.background.y = 0;
+		this.stage.addChild(this.background);
+		this.logo = new com_gEngine_display_Sprite("logo");
+		this.logo.x = com_gEngine_GEngine.virtualWidth * 0.10;
+		this.logo.y = com_gEngine_GEngine.virtualHeight * 0.10;
+		this.stage.addChild(this.logo);
+		this.hudLayer = new com_gEngine_display_StaticLayer();
+		this.stage.addChild(this.hudLayer);
+		this.pressStart = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.pressStart.set_text("PRESS ENTER TO PLAY");
+		this.pressStart.scaleX = 0.5;
+		this.pressStart.scaleY = 0.5;
+		this.pressStart.y = 660;
+		var tmp = this.pressStart.width() / 4;
+		this.pressStart.x = 250 - tmp;
+		this.pressStart.setColorMultiply(0.9,0.9,0.9,1);
+		this.hudLayer.addChild(this.pressStart);
+	}
+	,update: function(dt) {
+		com_framework_utils_State.prototype.update.call(this,dt);
+		GlobalGameData.soundControllWithoutIcon();
+		if(com_framework_utils_Input.i.isKeyCodePressed(13) && !this.changeScreen) {
+			this.changeScreen = true;
+			this.pressStart.removeFromParent();
+			this.transcparency = 1;
+		}
+		if(this.changeScreen) {
+			this.pressStart.setColorMultiply(1,0.749019607843137258,0.223529411764705893,0);
+			this.logo.colorMultiplication(this.transcparency,this.transcparency,this.transcparency,1);
+			this.background.colorMultiplication(this.transcparency,this.transcparency,this.transcparency,1);
+			if(this.transcparency > 0) {
+				this.transcparency -= 0.025;
+			}
+			if(this.transcparency <= 0) {
+				this.transcparency = 0;
+				this.startGame();
+			}
+		} else {
+			if(this.transcparency <= 0 || this.transcparency >= 1) {
+				this.more = !this.more;
+			}
+			if(this.more) {
+				this.transcparency += 0.025;
+			} else {
+				this.transcparency -= 0.025;
+			}
+			this.pressStart.setColorMultiply(1,0.749019607843137258,0.223529411764705893,this.transcparency);
+		}
+	}
+	,startGame: function() {
+		this.changeState(new states_GameState(3 + ""));
+	}
+	,__class__: states_IntroScreen
+});
+var states_SuccessScreen = function() {
+	this.more = false;
+	com_framework_utils_State.call(this);
+	GlobalGameData.levelCompleted();
+	this.score = GlobalGameData.score;
+	this.sprite = "hero";
+};
+$hxClasses["states.SuccessScreen"] = states_SuccessScreen;
+states_SuccessScreen.__name__ = "states.SuccessScreen";
+states_SuccessScreen.__super__ = com_framework_utils_State;
+states_SuccessScreen.prototype = $extend(com_framework_utils_State.prototype,{
+	load: function(resources) {
+		var atlas = new com_loading_basicResources_JoinAtlas(2048,2048);
+		atlas.add(new com_loading_basicResources_ImageLoader("victory"));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
+		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
+		resources.add(atlas);
+	}
+	,init: function() {
+		var image = new com_gEngine_display_Sprite("victory");
+		this.simulationLayer = new com_gEngine_display_Layer();
+		this.stage.addChild(this.simulationLayer);
+		this.display = new com_gEngine_display_Sprite(this.sprite);
+		var tmp = com_gEngine_GEngine.virtualWidth * 0.5;
+		var tmp1 = this.display.width() / 2;
+		this.display.x = tmp - tmp1;
+		var tmp2 = com_gEngine_GEngine.virtualHeight * 0.75;
+		var tmp3 = this.display.height();
+		this.display.y = tmp2 - tmp3;
+		this.display.scaleX = 3;
+		this.display.scaleY = 3;
+		this.display.timeline.frameRate = 0.1;
+		this.display.timeline.playAnimation("idle");
+		this.simulationLayer.addChild(this.display);
+		image.x = com_gEngine_GEngine.virtualWidth * 0.5 - image.width() * 0.5 / 2;
+		image.y = 70;
+		image.scaleX = 0.5;
+		image.scaleY = 0.5;
+		this.stage.addChild(image);
+		var scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		scoreDisplay.set_text("YOUR SCORE IS " + this.score);
+		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 - 7;
+		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2 - 30;
+		scoreDisplay.setColorMultiply(0.66666666666666663,0.66666666666666663,0,1);
+		this.stage.addChild(scoreDisplay);
+		this.pressContinue = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.pressContinue.set_text("PRESS ENTER");
+		this.pressContinue.scaleX = 0.66666666666666663;
+		this.pressContinue.scaleY = 0.66666666666666663;
+		this.pressContinue.y = 660;
+		var tmp4 = this.pressContinue.width() / 3;
+		this.pressContinue.x = 250 - tmp4;
+		this.stage.addChild(this.pressContinue);
+	}
+	,update: function(dt) {
+		com_framework_utils_State.prototype.update.call(this,dt);
+		GlobalGameData.soundControllWithoutIcon();
+		if(com_framework_utils_Input.i.isKeyCodePressed(13) || com_framework_utils_Input.i.isMousePressed()) {
+			this.startNextLevel();
+		}
+		if(this.transcparency <= 0 || this.transcparency >= 1) {
+			this.more = !this.more;
+		}
+		if(this.more) {
+			this.transcparency += 0.025;
+		} else {
+			this.transcparency -= 0.025;
+		}
+		this.pressContinue.setColorMultiply(0.66666666666666663,0.66666666666666663,0,this.transcparency);
+	}
+	,startNextLevel: function() {
+		if(GlobalGameData.level > GlobalGameData.maxLevel) {
+			this.changeState(new states_Credits());
+		} else {
+			this.changeState(new states_GameState(GlobalGameData.level + ""));
+		}
+	}
+	,__class__: states_SuccessScreen
 });
 function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id__ = $global.$haxeUID++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = m.bind(o); o.hx__closures__[m.__id__] = f; } return f; }
 $global.$haxeUID |= 0;
@@ -25590,7 +25995,8 @@ js_Boot.__toStr = ({ }).toString;
 GlobalGameData.gravity = 2000;
 GlobalGameData.score = 0;
 GlobalGameData.continues = 3;
-GlobalGameData.level = 0;
+GlobalGameData.level = 1;
+GlobalGameData.maxLevel = 3;
 Xml.Element = 0;
 Xml.PCData = 1;
 Xml.CData = 2;
@@ -25604,6 +26010,11 @@ com_collision_platformer_CollisionEngine.colliders = [];
 com_framework_utils_Perlin.PERMUTATIONS = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
 com_gEngine_GEngine.drawCount = 0;
 com_gEngine_GEngine.extraInfo = "";
+com_soundLib_SoundManager.musicPosition = 0;
+com_soundLib_SoundManager.soundMuted = false;
+com_soundLib_SoundManager.musicMuted = false;
+gameObjects_Boss.gateOutX = 300;
+gameObjects_Boss.gateOutY = 600;
 haxe_Unserializer.DEFAULT_RESOLVER = new haxe__$Unserializer_DefaultResolver();
 haxe_Unserializer.BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%:";
 haxe_crypto_Base64.CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -25782,6 +26193,7 @@ kha_internal_HdrFormat.formatPattern = new EReg("FORMAT=32-bit_rle_rgbe","i");
 kha_internal_HdrFormat.widthHeightPattern = new EReg("-Y ([0-9]+) \\+X ([0-9]+)","i");
 kha_js_Sound.loading = [];
 kha_netsync_ControllerBuilder.nextId = 0;
+states_Credits.credistHeight = 1000;
 Main.main();
 })(typeof exports != "undefined" ? exports : typeof window != "undefined" ? window : typeof self != "undefined" ? self : this, typeof window != "undefined" ? window : typeof global != "undefined" ? global : typeof self != "undefined" ? self : this);
 

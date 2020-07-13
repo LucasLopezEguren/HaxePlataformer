@@ -12,6 +12,7 @@ import com.collision.platformer.CollisionGroup;
 /* @author Lucas (181830) */
 class Gate extends Entity {
 	var collisionGroup:CollisionGroup;
+	var endGateCollision:CollisionGroup;
 	public var collision:CollisionBox;
 	public var display:Sprite;
 	public var destinyX:Float;

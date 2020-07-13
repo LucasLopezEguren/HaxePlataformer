@@ -11,6 +11,7 @@ import gameObjects.enemyMinions.Fireball;
 import gameObjects.effects.BlueFireball;
 import gameObjects.Gate;
 import gameObjects.EndGate;
+import gameObjects.Boss;
 import gameObjects.Torch;
 import GlobalGameData.GGD;
 import com.loading.basicResources.SparrowLoader;
@@ -21,7 +22,6 @@ import com.collision.platformer.CollisionGroup;
 import com.loading.basicResources.ImageLoader;
 import format.tmx.Data.TmxObjectType;
 import com.gEngine.display.Sprite;
-import com.gEngine.shaders.ShRetro;
 import com.gEngine.display.Blend;
 import com.gEngine.shaders.ShRgbSplit;
 import com.gEngine.display.Camera;
@@ -55,26 +55,31 @@ class GameState extends State {
 	var simulationLayer:Layer;
 	var hudLayer:StaticLayer;
 	var touchJoystick:VirtualGamepad;
-	var tray:helpers.Tray;
+	
 	var dialogCollision:CollisionGroup;
 	var enemiesCollisions:CollisionGroup;
 	var endGateCollisions:CollisionGroup;
 	var secretGateCollisions:CollisionGroup;
 	var torchCollisions:CollisionGroup;
 	var enemyProyectilesCollisions:CollisionGroup;
+	var level:String;
 
-	public function new(room:String, fromRoom:String = null) {
+	public function new(level:String, fromRoom:String = null) {
 		super();
+		this.level = level;
+		trace(level);
 	}
 
 	override function load(resources:Resources) {
-		resources.add(new DataLoader(Assets.blobs.testRoom_tmxName));
+		resources.add(new DataLoader("level"+level+"_tmx"));
 		var atlas = new JoinAtlas(2048, 2048);
 
 		atlas.add(new TilesheetLoader("tiles2", 32, 32, 0));
 		atlas.add(new FontLoader(Assets.fonts.PixelOperator8_BoldName, 30));
-		atlas.add(new ImageLoader("salt"));
+		atlas.add(new FontLoader(Assets.fonts.Kenney_PixelName, 24));
 		atlas.add(new ImageLoader("yo"));
+		atlas.add(new ImageLoader("skyBackground"));
+		atlas.add(new ImageLoader("cave"));
 		atlas.add(new ImageLoader("avatar"));
 		atlas.add(new SpriteSheetLoader("ghost", 60, 60, 0, [
 			new Sequence("idle", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
@@ -114,13 +119,12 @@ class GameState extends State {
 			new Sequence("heavyDamage", [19, 20, 21, 22, 23]), 
 			new Sequence("damage", [25, 26, 27]), 
 			new Sequence("rangeAttack", [11])]));
-		atlas.add(new FontLoader("Kenney_Pixel", 24));
 		resources.add(atlas);
 	}
 
 	var currentHpBar:RectangleDisplay;
 	var hpBarTotal:RectangleDisplay;
-	var scoreDisplay:Text;
+	var scoreLevelDisplay:Text;
 	override function init() {
 		stageColor(0.5, .5, 0.5);
 		
@@ -136,42 +140,49 @@ class GameState extends State {
 		GGD.simulationLayer = simulationLayer;
 		if (GGD.player != null) {
 			player = GGD.player;
-			player.respawn(250, 200, simulationLayer);
+			player.respawn(100, 100, simulationLayer);
 		} else {
-			player = new Player(250, 200, simulationLayer);
+			player = new Player(100, 100, simulationLayer);
 			GGD.player = player;
 		}
-		var mayonnaiseMap:TileMapDisplay;
-		worldMap = new Tilemap("testRoom_tmx", 1);
+		
+		
+		worldMap = new Tilemap("level"+level+"_tmx", 1);
 		worldMap.init(function(layerTilemap, tileLayer) {
 			if (tileLayer.properties.exists("damage"))return;
 			if (!tileLayer.properties.exists("noCollision")) {
 				layerTilemap.createCollisions(tileLayer);
 			}
 			simulationLayer.addChild(layerTilemap.createDisplay(tileLayer, new Sprite("tiles2")));
-			mayonnaiseMap = layerTilemap.createDisplay(tileLayer, new Sprite("tiles2"));
-			simulationLayer.addChild(mayonnaiseMap);
+			
+			
 		}, parseMapObjects);
 
-		damageMap = new Tilemap("testRoom_tmx", 1);
+		damageMap = new Tilemap("level"+level+"_tmx", 1);
 		damageMap.init(function(layerTilemap, tileLayer) {
+			if (!tileLayer.properties.exists("damage"))return;
 			if (!tileLayer.properties.exists("noCollision")) {
 				layerTilemap.createCollisions(tileLayer);
 			}
 			simulationLayer.addChild(layerTilemap.createDisplay(tileLayer, new Sprite("tiles2")));
-			mayonnaiseMap = layerTilemap.createDisplay(tileLayer, new Sprite("tiles2"));
-			simulationLayer.addChild(mayonnaiseMap);
+			
+			
 		});
-
-		tray = new Tray(mayonnaiseMap);
+		
+		if (GGD.player != null) {
+			player = GGD.player;
+			player.respawn(100, 100, simulationLayer);
+		} else {
+			player = new Player(100, 100, simulationLayer);
+			GGD.player = player;
+		}
+		
 		
 		stage.defaultCamera().limits(0, 0, worldMap.widthIntTiles * 32, worldMap.heightInTiles * 32);
 		
 		addChild(player);
 
 		createTouchJoystick();
-
-		stage.defaultCamera().postProcess = new ShRetro(Blend.blendDefault());
 
 		hudLayer = new StaticLayer();
 		stage.addChild(hudLayer);
@@ -196,12 +207,12 @@ class GameState extends State {
 		avatar.scaleX = avatar.scaleY = 3;
 		hudLayer.addChild(avatar);
 
-		scoreDisplay = new Text(Assets.fonts.PixelOperator8_BoldName);
-		scoreDisplay.x = hpBarTotal.x + 35;
-		scoreDisplay.y = hpBarTotal.y + hpBarTotal.scaleY + 5;
-		scoreDisplay.scaleX = scoreDisplay.scaleY = 1 / 2;
-		scoreDisplay.text = 'Score: ' + GGD.score;
-		hudLayer.addChild(scoreDisplay);
+		scoreLevelDisplay = new Text(Assets.fonts.PixelOperator8_BoldName);
+		scoreLevelDisplay.x = hpBarTotal.x + 35;
+		scoreLevelDisplay.y = hpBarTotal.y + hpBarTotal.scaleY + 5;
+		scoreLevelDisplay.scaleX = scoreLevelDisplay.scaleY = 1 / 2;
+		scoreLevelDisplay.text = 'Score: ' + GGD.score;
+		hudLayer.addChild(scoreLevelDisplay);
 
 		var continues = new Text(Assets.fonts.PixelOperator8_BoldName);
 		continues.x = hpBarTotal.x - 10;
@@ -256,6 +267,10 @@ class GameState extends State {
 					var endGate = new EndGate(simulationLayer, endGateCollisions, object.x, object.y);
 					addChild(endGate);
 				}
+				if (object.type == "boss") {
+					var endGate = new Boss(simulationLayer, enemiesCollisions, endGateCollisions, object.x, object.y);
+					addChild(endGate);
+				}
 				if (object.type == "gate") {
 					var gate = new Gate(simulationLayer, secretGateCollisions, object.x, object.y, Std.parseFloat(object.properties.get("destinyX")), Std.parseFloat(object.properties.get("destinyY")));
 					addChild(gate);
@@ -271,7 +286,7 @@ class GameState extends State {
 	override function update(dt:Float) {
 		super.update(dt);
 		stage.defaultCamera().scale = 2;
-		scoreDisplay.text = "Score: " + GGD.score;
+		scoreLevelDisplay.text = "Score: " + GGD.score + " - Level: " + GGD.level;
 		currentHpBar.scaleX = (player.currentHp * 296) / player.maxHp;
 		if (currentHpBar.scaleX <= 0) currentHpBar.scaleX = 0;
 		CollisionEngine.collide(player.collision, worldMap.collision);
@@ -282,6 +297,7 @@ class GameState extends State {
 		if(endGateCollisions != null) CollisionEngine.collide(endGateCollisions, worldMap.collision);
 		CollisionEngine.overlap(player.collision, enemiesCollisions, playerVsEnemy);
 		secretGateCollisions.overlap(player.collision, playerVsScertGate);
+		endGateCollisions.overlap(player.collision, playerVsEndGate);
 		torchCollisions.overlap(player.collision, playerVsTorch);
 		CollisionEngine.overlap(GGD.enemyProyectilesCollisions, enemiesCollisions);
 		CollisionEngine.overlap(GGD.playerProyectilesCollisions, enemiesCollisions, proyectilesVsEnemy);
@@ -291,10 +307,6 @@ class GameState extends State {
 			CollisionEngine.collide(player.hitCollision, enemiesCollisions, enemyVsPlayerHit);
 		}
 		stage.defaultCamera().setTarget(player.collision.x, player.collision.y);
-
-		tray.setContactPosition(player.collision.x + player.collision.width / 2, player.collision.y + player.collision.height + 1, Sides.BOTTOM);
-		tray.setContactPosition(player.collision.x + player.collision.width + 1, player.collision.y + player.collision.height / 2, Sides.RIGHT);
-		tray.setContactPosition(player.collision.x - 1, player.collision.y + player.collision.height / 2, Sides.LEFT);
 	}
 
 	function dialogVsPlayer(dialogCollision:ICollider, playerCollision:ICollider) {
@@ -312,20 +324,24 @@ class GameState extends State {
 		var enemy:EnemyMinion = cast enemiesCollisions.userData;
 		player.damage(enemy.get_hitDamage());
 		if (player.currentHp <= 0) {
-			changeState(new GameOver("" + GGD.score, "0", "hero", GlobalGameData.level));
+			changeState(new GameOver("" + GGD.score, "hero", GlobalGameData.level));
 		}
 	}
 
 	function playerVsDamage(enemiesCollisions:ICollider, playerCollision:ICollider) {
-		player.damage(player.maxHp);
+		player.damage(100);
 		if (player.currentHp <= 0) {
-			changeState(new GameOver("" + GGD.score, "0", "hero", GlobalGameData.level));
+			changeState(new GameOver("" + GGD.score, "hero", GlobalGameData.level));
 		}
 	}
 
 	function playerVsScertGate(secretGate:ICollider, playerCollision:ICollider) {
 		var secretGate:Gate = cast secretGate.userData;
 		player.transport(secretGate.destinyX, secretGate.destinyY);
+	}
+
+	function playerVsEndGate(secretGate:ICollider, playerCollision:ICollider) {
+		changeState(new SuccessScreen());
 	}
 
 	function enemyVsPlayerHit(enemiesCollisions:ICollider, hitCollision:ICollider) {
@@ -343,7 +359,7 @@ class GameState extends State {
 		var proyectile:Fireball = cast aProyectile.userData;
 		player.damage(proyectile.get_hitDamage());
 		if (player.currentHp <= 0) {
-			changeState(new GameOver("" + GGD.score, "0", "hero", GlobalGameData.level));
+			changeState(new GameOver("" + GGD.score, "hero", GlobalGameData.level));
 		}
 	}
 

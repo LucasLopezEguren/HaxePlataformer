@@ -231,6 +231,18 @@
 			"types": []
 		},
 		{
+			"name": "cave",
+			"files": [
+				"cave.png"
+			],
+			"file_sizes": [
+				605657
+			],
+			"type": "image",
+			"original_width": 868,
+			"original_height": 800
+		},
+		{
 			"name": "filmGrain_frag",
 			"files": [
 				"filmGrain.frag.essl",
@@ -475,14 +487,14 @@
 		{
 			"name": "hellsGateIntro",
 			"files": [
-				"hellsGateIntro.jpg"
+				"hellsGateIntro.png"
 			],
 			"file_sizes": [
-				1687533
+				1253308
 			],
 			"type": "image",
-			"original_width": 2560,
-			"original_height": 1700
+			"original_width": 1280,
+			"original_height": 720
 		},
 		{
 			"name": "hero",
@@ -495,6 +507,36 @@
 			"type": "image",
 			"original_width": 720,
 			"original_height": 300
+		},
+		{
+			"name": "level1_tmx",
+			"files": [
+				"level1.tmx"
+			],
+			"file_sizes": [
+				7789
+			],
+			"type": "blob"
+		},
+		{
+			"name": "level2_tmx",
+			"files": [
+				"level2.tmx"
+			],
+			"file_sizes": [
+				8761
+			],
+			"type": "blob"
+		},
+		{
+			"name": "level3_tmx",
+			"files": [
+				"level3.tmx"
+			],
+			"file_sizes": [
+				3907
+			],
+			"type": "blob"
 		},
 		{
 			"name": "logo",
@@ -1362,30 +1404,6 @@
 			"original_height": 160
 		},
 		{
-			"name": "salt",
-			"files": [
-				"salt.png"
-			],
-			"file_sizes": [
-				524
-			],
-			"type": "image",
-			"original_width": 29,
-			"original_height": 36
-		},
-		{
-			"name": "sand",
-			"files": [
-				"sand.png"
-			],
-			"file_sizes": [
-				27658
-			],
-			"type": "image",
-			"original_width": 160,
-			"original_height": 128
-		},
-		{
 			"name": "sand_tsx",
 			"files": [
 				"sand.tsx"
@@ -2054,14 +2072,16 @@
 			]
 		},
 		{
-			"name": "testRoom_tmx",
+			"name": "skyBackground",
 			"files": [
-				"testRoom.tmx"
+				"skyBackground.png"
 			],
 			"file_sizes": [
-				7487
+				230111
 			],
-			"type": "blob"
+			"type": "image",
+			"original_width": 1600,
+			"original_height": 800
 		},
 		{
 			"name": "tiles2",
@@ -2176,16 +2196,28 @@
 			]
 		},
 		{
+			"name": "victory",
+			"files": [
+				"victory.png"
+			],
+			"file_sizes": [
+				499233
+			],
+			"type": "image",
+			"original_width": 1024,
+			"original_height": 842
+		},
+		{
 			"name": "yo",
 			"files": [
 				"yo.png"
 			],
 			"file_sizes": [
-				2594
+				4480
 			],
 			"type": "image",
-			"original_width": 185,
-			"original_height": 504
+			"original_width": 28,
+			"original_height": 75
 		},
 		{
 			"name": "yo_tsx",

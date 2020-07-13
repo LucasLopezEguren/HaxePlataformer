@@ -1,5 +1,6 @@
 package cinematic;
 
+import kha.Assets;
 import com.sequencer.SequenceCode;
 import com.gEngine.display.Layer;
 import com.gEngine.display.Text;
@@ -25,7 +26,7 @@ class Dialog extends Entity {
 		collider.userData = this;
 		collider.width = width;
 		collider.height = height;
-		displayText = new Text("Kenney_Pixel");
+		displayText = new Text(Assets.fonts.Kenney_PixelName);
 		displayText.text = text;
 		displayText.x = x;
         displayText.y = y;

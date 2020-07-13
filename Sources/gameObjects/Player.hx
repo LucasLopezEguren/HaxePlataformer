@@ -261,7 +261,6 @@ class Player extends Entity {
 			currentHp -= damageRecieve;
 			if (currentHp <= 0) {
 				receiveHeavyDamage = true;
-				GGD.continues -= 1;
 				die();
 				return;
 			}

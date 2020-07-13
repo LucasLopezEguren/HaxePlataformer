@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.2" tiledversion="1.3.4" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="53" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="20">
+<map version="1.2" tiledversion="1.3.4" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="53" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="30">
  <tileset firstgid="1" name="tiles2" tilewidth="32" tileheight="32" tilecount="13" columns="1">
   <image source="tiles2.png" width="32" height="416"/>
  </tileset>
@@ -9,13 +9,60 @@
    <image width="29" height="36" source="salt.png"/>
   </tile>
  </tileset>
+ <tileset firstgid="15" name="skyBackground" tilewidth="1600" tileheight="800" tilecount="1" columns="1">
+  <image source="skyBackground.png" trans="ff00ff" width="1600" height="800"/>
+ </tileset>
+ <objectgroup id="4" name="gameInfo">
+  <object id="21" gid="15" x="4.77841" y="731.89" width="1684.6" height="732.754">
+   <properties>
+    <property name="spriteName" value="skyBackground"/>
+   </properties>
+  </object>
+  <object id="8" type="dialog" x="324.085" y="581.475" width="303.531" height="119.29">
+   <properties>
+    <property name="text">When the ghost are purple 
+they can confuse you.</property>
+   </properties>
+  </object>
+  <object id="12" type="ghost" x="608.061" y="615.01"/>
+  <object id="16" name="End Gate" type="endGate" x="1610.58" y="107.684" width="43.4329" height="79.9166">
+   <properties>
+    <property name="destinyX" value="200"/>
+    <property name="destinyY" type="float" value="100"/>
+   </properties>
+  </object>
+  <object id="22" type="dialog" x="38.041" y="45.5616" width="97.4552" height="104.106">
+   <properties>
+    <property name="text">Move with arrows 
+ and jum with &quot;Space&quot;</property>
+   </properties>
+  </object>
+  <object id="23" type="dialog" x="132.402" y="598.711" width="184.224" height="99.7673">
+   <properties>
+    <property name="text">Remember you are a warrior 
+ use &quot;X&quot; to attack!</property>
+   </properties>
+  </object>
+  <object id="24" type="ghost" x="1212.59" y="425.166"/>
+  <object id="25" type="ghost" x="1004.35" y="297.182"/>
+  <object id="26" type="ghost" x="1275.5" y="134.491"/>
+  <object id="27" type="ghost" x="1325.39" y="78.0917"/>
+  <object id="28" type="ghost" x="1383.96" y="160.522"/>
+  <object id="29" type="dialog" x="635.659" y="520.62" width="498.76" height="177.859">
+   <properties>
+    <property name="text">Becarefull with they spikes 
+ they really hurt! 
+Ouch</property>
+   </properties>
+  </object>
+ </objectgroup>
  <layer id="1" name="Tile Layer 1" width="53" height="23">
   <data encoding="csv">
 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
-6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
-6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
-6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
+6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
+6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
+6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
+6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
@@ -31,8 +78,8 @@
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
 6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
-6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
-6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,6,6,6,6,
+6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,
+6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,6,6,6,6,
 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6
 </data>
  </layer>
@@ -66,47 +113,4 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup id="4" name="gameInfo">
-  <object id="7" gid="14" x="1537.29" y="191.371" width="29.2858" height="36.9525">
-   <properties>
-    <property name="spriteName" value="salt"/>
-   </properties>
-  </object>
-  <object id="8" type="dialog" x="1387" y="34.8333" width="277.5" height="156.167">
-   <properties>
-    <property name="text">THANK YOU CHIVITOBOY! 
-
-
- BUT YOUR FRIES ARE IN
- ANOTHER CASTLE</property>
-   </properties>
-  </object>
-  <object id="9" gid="14" x="1295.29" y="352.704" width="29.2858" height="36.9525">
-   <properties>
-    <property name="spriteName" value="salt"/>
-   </properties>
-  </object>
-  <object id="10" type="dialog" x="1161.92" y="227.25" width="247.5" height="123.5">
-   <properties>
-    <property name="text" value="GO GO GO CHIVITO!!"/>
-   </properties>
-  </object>
-  <object id="11" type="salamander" x="142.46" y="583.739" width="39.9583" height="15.6359"/>
-  <object id="12" type="ghost" x="608.061" y="615.01"/>
-  <object id="13" type="torch" x="59.0688" y="649.757" width="29.5344" height="45.1703"/>
-  <object id="16" type="gate" x="1296.04" y="81.6539" width="43.4329" height="79.9166">
-   <properties>
-    <property name="destinyX" value="200"/>
-    <property name="destinyY" type="float" value="100"/>
-   </properties>
-  </object>
-  <object id="17" type="endGate" x="1594.86" y="99.0271" width="43.4329" height="76.442"/>
-  <object id="18" type="gate" x="485.58" y="201.529" width="43.4329" height="79.9166">
-   <properties>
-    <property name="destinyX" value="1400"/>
-    <property name="destinyY" type="float" value="100"/>
-   </properties>
-  </object>
-  <object id="19" type="endGate" x="287.526" y="564.628" width="43.4329" height="76.442"/>
- </objectgroup>
 </map>
