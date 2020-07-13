@@ -54,18 +54,18 @@ class Salamander extends EnemyMinion {
 	}
 
 	override function aggresiveStance(dt:Float){
-			collision.velocityX = 0;
-			if(target.x - collision.x > 0) {
-				display.scaleX = 1;
-			} else {
-				display.scaleX = -1;
-			}
-			if (timeBetweenAtacks <= timeBetweenAtacksCounter){
-				attack();
-				timeBetweenAtacksCounter = 0;
-			} else {
-				timeBetweenAtacksCounter += dt;
-			}
+		collision.velocityX = 0;
+		if(target.x - collision.x > 0) {
+			display.scaleX = 1;
+		} else {
+			display.scaleX = -1;
+		}
+		if (timeBetweenAtacks <= timeBetweenAtacksCounter){
+			attack();
+			timeBetweenAtacksCounter = 0;
+		} else {
+			timeBetweenAtacksCounter += dt;
+		}
 	}
 
 	override function passiveStance(dt:Float){

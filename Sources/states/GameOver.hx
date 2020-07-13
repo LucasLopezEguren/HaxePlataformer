@@ -84,18 +84,20 @@ class GameOver extends State {
 		levelDisplay.setColorMultiply(100 / 255, 20 / 255, 100 / 255, 1);
 		scoreDisplay.scaleX = scoreDisplay.scaleY = 2 / 3;
 
-		var avatar = new Sprite("avatar");
-		avatar.smooth = true;
-		avatar.x = image.x + (image.width()/2) - avatar.width() * 3;
-		avatar.y = image.y + image.height() - avatar.width();
-		avatar.scaleX = avatar.scaleY = 3;
-		simulationLayer.addChild(avatar);
-		var continues = new Text(Assets.fonts.PixelOperator8_BoldName);
-		continues.x = avatar.x + avatar.width() * 3;
-		continues.y = image.y + image.height() + 10;
-		continues.scaleX = continues.scaleY = 1 / 2;
-		continues.text = 'x' + GGD.continues;
-		simulationLayer.addChild(continues);
+		if (GGD.continues >= 0) {
+			var avatar = new Sprite("avatar");
+			avatar.smooth = true;
+			avatar.x = image.x + (image.width()/2) - avatar.width() * 3;
+			avatar.y = image.y + image.height() - avatar.width();
+			avatar.scaleX = avatar.scaleY = 3;
+			simulationLayer.addChild(avatar);
+			var continues = new Text(Assets.fonts.PixelOperator8_BoldName);
+			continues.x = avatar.x + avatar.width() * 3;
+			continues.y = image.y + image.height() + 10;
+			continues.scaleX = continues.scaleY = 1 / 2;
+			continues.text = 'x' + GGD.continues;
+			simulationLayer.addChild(continues);
+		}
 
 		stage.addChild(scoreDisplay);
 		stage.addChild(levelDisplay);

@@ -72,6 +72,7 @@ class Player extends Entity {
 
 		isDying = false;
 		currentHp = maxHp;
+		
 	}
 
 	var isReapiring:Bool = false;
@@ -119,6 +120,8 @@ class Player extends Entity {
 		collision.maxVelocityX = 500;
 		collision.maxVelocityY = 800;
 		collision.dragX = 0.9;
+
+		effects.add(new RangeAttack(this));
 	}
 
 	inline function hitX():Float {

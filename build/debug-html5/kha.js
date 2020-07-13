@@ -9181,6 +9181,44 @@ format_tmx_Tools.applyObjectTypeTemplate = function(obj,ot) {
 		}
 	}
 };
+var gameObjects_Effect = function(player) {
+	this.isAcumulative = true;
+	com_framework_utils_Entity.call(this);
+	this.player = player;
+	player.addEffect(this);
+};
+$hxClasses["gameObjects.Effect"] = gameObjects_Effect;
+gameObjects_Effect.__name__ = "gameObjects.Effect";
+gameObjects_Effect.__super__ = com_framework_utils_Entity;
+gameObjects_Effect.prototype = $extend(com_framework_utils_Entity.prototype,{
+	effect: function(dt) {
+	}
+	,__class__: gameObjects_Effect
+});
+var gameObjects_EndGate = function(layer,collisions,x,y) {
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Sprite("gate");
+	this.display.timeline.playAnimation("idle");
+	this.display.colorAdd(0.75,0,0,0);
+	this.display.colorMultiplication(0,0.6,0.6,1);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collisionGroup = collisions;
+	this.collision.userData = this;
+	var tmp = this.display.width();
+	this.collision.width = tmp * 0.5;
+	this.collision.height = this.display.height();
+	collisions.add(this.collision);
+	this.display.x = this.collision.x = x;
+	this.display.y = this.collision.y = y;
+	this.display.offsetX = -this.display.width() * 0.25;
+	layer.addChild(this.display);
+};
+$hxClasses["gameObjects.EndGate"] = gameObjects_EndGate;
+gameObjects_EndGate.__name__ = "gameObjects.EndGate";
+gameObjects_EndGate.__super__ = com_framework_utils_Entity;
+gameObjects_EndGate.prototype = $extend(com_framework_utils_Entity.prototype,{
+	__class__: gameObjects_EndGate
+});
 var gameObjects_EnemyMinion = function(layer,collisions,x,y) {
 	this.lastDamageReceived = 0;
 	this.disapearTime = 2;
@@ -9272,184 +9310,6 @@ gameObjects_EnemyMinion.prototype = $extend(com_framework_utils_Entity.prototype
 	}
 	,__class__: gameObjects_EnemyMinion
 });
-var gameObjects_Boss = function(layer,collisions,endGateCollision,x,y) {
-	this.MAX_SPEED = 200;
-	gameObjects_EnemyMinion.call(this,layer,collisions,x,y);
-	this.hitDamage = 10;
-	this.agressionRange = 200;
-	this.endGateCollision = endGateCollision;
-	this.simulationlayer = layer;
-	this.scorePoints = this.currentHp = this.hpMax = 50;
-	this.display = new com_gEngine_display_Sprite("ghost");
-	layer.addChild(this.display);
-	this.hitTimes = Math.ceil(Math.random() * 3);
-	this.display.timeline.frameRate = 0.04;
-	this.display.timeline.playAnimation("idle");
-	this.display.offsetX = -this.display.width() / 6;
-	this.display.offsetY = -this.display.height() * 0.25;
-	var tmp = this.display.width();
-	this.display.pivotX = tmp * 0.25;
-	this.display.offsetY = -this.display.height() / 3;
-	this.display.set_smooth(false);
-	var tmp1 = this.display.width();
-	this.collision.width = tmp1 / 3;
-	var tmp2 = this.display.height();
-	this.collision.height = tmp2 / 3;
-	if(this.hitTimes == 1) {
-		this.display.colorMultiplication(1,0,1,1);
-	} else {
-		this.display.colorMultiplication(1,1,1,1);
-	}
-};
-$hxClasses["gameObjects.Boss"] = gameObjects_Boss;
-gameObjects_Boss.__name__ = "gameObjects.Boss";
-gameObjects_Boss.__super__ = gameObjects_EnemyMinion;
-gameObjects_Boss.prototype = $extend(gameObjects_EnemyMinion.prototype,{
-	get_hitDamage: function() {
-		if(!this.stunned && !this.target.invulerable && !this.target.isDead()) {
-			this.hitTimes++;
-			this.hitTimes %= 3;
-			if(this.hitTimes == 1) {
-				this.target.addEffect(new gameObjects_effects_Confusion(this.target));
-			}
-		}
-		return gameObjects_EnemyMinion.prototype.get_hitDamage.call(this);
-	}
-	,update: function(dt) {
-		gameObjects_EnemyMinion.prototype.update.call(this,dt);
-		if(this.hitTimes == 0) {
-			this.display.colorMultiplication(1,0,1,1);
-		} else {
-			this.display.colorMultiplication(1,1,1,1);
-		}
-	}
-	,aggresiveStance: function(dt) {
-		var x = this.target.get_x() - (this.collision.x + this.collision.width * 0.5);
-		var y = this.target.get_y() - (this.collision.y + this.collision.height * 1.5);
-		if(y == null) {
-			y = 0;
-		}
-		if(x == null) {
-			x = 0;
-		}
-		var dir_x = x;
-		var dir_y = y;
-		if(Math.abs(dir_x) < 10) {
-			dir_x = 0;
-		}
-		if(Math.abs(dir_y) < 10) {
-			dir_y = 0;
-		}
-		var x1 = dir_x;
-		var y1 = dir_y;
-		if(y1 == null) {
-			y1 = 0;
-		}
-		if(x1 == null) {
-			x1 = 0;
-		}
-		var v_x = x1;
-		var v_y = y1;
-		var currentLength = Math.sqrt(v_x * v_x + v_y * v_y);
-		if(currentLength != 0) {
-			var mul = 1 / currentLength;
-			v_x *= mul;
-			v_y *= mul;
-		}
-		dir_x = v_x;
-		dir_y = v_y;
-		var value = this.MAX_SPEED;
-		var x2 = dir_x * value;
-		var y2 = dir_y * value;
-		if(y2 == null) {
-			y2 = 0;
-		}
-		if(x2 == null) {
-			x2 = 0;
-		}
-		var v_x1 = x2;
-		var v_y1 = y2;
-		dir_x = v_x1;
-		dir_y = v_y1;
-		this.collision.accelerationX = dir_x;
-		this.collision.accelerationY = dir_y;
-		this.collision.maxVelocityX = this.collision.maxVelocityX = 100;
-	}
-	,passiveStance: function(dt) {
-		this.collision.velocityX = 0;
-		this.collision.velocityY = 0;
-	}
-	,die: function() {
-		gameObjects_EnemyMinion.prototype.die.call(this);
-		var endGate = new gameObjects_EndGate(this.simulationlayer,this.endGateCollision,gameObjects_Boss.gateOutX,gameObjects_Boss.gateOutY);
-		this.addChild(endGate);
-	}
-	,render: function() {
-		this.display.x = this.collision.x + this.collision.width * 0.5;
-		this.display.y = this.collision.y;
-		if(this.display.timeline.currentAnimation == "die") {
-			return;
-		}
-		if(this.stunned) {
-			return;
-		}
-		if(Math.abs(this.collision.velocityX) > Math.abs(this.collision.velocityY)) {
-			if(this.collision.accelerationX > 0) {
-				if(this.collision.velocityX < 0) {
-					this.display.timeline.playAnimation("slide");
-				} else {
-					this.display.scaleX = -1;
-					this.display.timeline.playAnimation("idle");
-				}
-			} else if(this.collision.velocityX > 0) {
-				this.display.timeline.playAnimation("slide");
-			} else {
-				this.display.scaleX = 1;
-				this.display.timeline.playAnimation("idle");
-			}
-		}
-		gameObjects_EnemyMinion.prototype.render.call(this);
-	}
-	,__class__: gameObjects_Boss
-});
-var gameObjects_Effect = function(player) {
-	this.isAcumulative = true;
-	com_framework_utils_Entity.call(this);
-	this.player = player;
-	player.addEffect(this);
-};
-$hxClasses["gameObjects.Effect"] = gameObjects_Effect;
-gameObjects_Effect.__name__ = "gameObjects.Effect";
-gameObjects_Effect.__super__ = com_framework_utils_Entity;
-gameObjects_Effect.prototype = $extend(com_framework_utils_Entity.prototype,{
-	effect: function(dt) {
-	}
-	,__class__: gameObjects_Effect
-});
-var gameObjects_EndGate = function(layer,collisions,x,y) {
-	com_framework_utils_Entity.call(this);
-	this.display = new com_gEngine_display_Sprite("gate");
-	this.display.timeline.playAnimation("idle");
-	this.display.colorAdd(0.75,0,0,0);
-	this.display.colorMultiplication(0,0.6,0.6,1);
-	this.collision = new com_collision_platformer_CollisionBox();
-	this.collisionGroup = collisions;
-	this.collision.userData = this;
-	var tmp = this.display.width();
-	this.collision.width = tmp * 0.5;
-	this.collision.height = this.display.height();
-	collisions.add(this.collision);
-	this.display.x = this.collision.x = x;
-	this.display.y = this.collision.y = y;
-	this.display.offsetX = -this.display.width() * 0.25;
-	layer.addChild(this.display);
-};
-$hxClasses["gameObjects.EndGate"] = gameObjects_EndGate;
-gameObjects_EndGate.__name__ = "gameObjects.EndGate";
-gameObjects_EndGate.__super__ = com_framework_utils_Entity;
-gameObjects_EndGate.prototype = $extend(com_framework_utils_Entity.prototype,{
-	__class__: gameObjects_EndGate
-});
 var gameObjects_Gate = function(layer,collisions,x,y,destinyX,destinyY) {
 	com_framework_utils_Entity.call(this);
 	this.display = new com_gEngine_display_Sprite("gate");
@@ -9508,6 +9368,7 @@ var gameObjects_Player = function(x,y,layer) {
 	this.collision.maxVelocityX = 500;
 	this.collision.maxVelocityY = 800;
 	this.collision.dragX = 0.9;
+	this.effects.add(new gameObjects_effects_RangeAttack(this));
 };
 $hxClasses["gameObjects.Player"] = gameObjects_Player;
 gameObjects_Player.__name__ = "gameObjects.Player";
@@ -9965,6 +9826,75 @@ gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
 	}
 	,__class__: gameObjects_Player
 });
+var gameObjects_Proyectile = function() {
+	this.hitDamage = 60;
+	this.speed = 150;
+	this.currentTime = 0;
+	this.lifeTime = 4;
+	com_framework_utils_Entity.call(this);
+	this.collision = new com_collision_platformer_CollisionBox();
+	this.collision.width = this.display.width();
+	this.collision.height = this.display.height();
+	this.collision.userData = this;
+};
+$hxClasses["gameObjects.Proyectile"] = gameObjects_Proyectile;
+gameObjects_Proyectile.__name__ = "gameObjects.Proyectile";
+gameObjects_Proyectile.__super__ = com_framework_utils_Entity;
+gameObjects_Proyectile.prototype = $extend(com_framework_utils_Entity.prototype,{
+	get_hitDamage: function() {
+		return this.hitDamage;
+	}
+	,die: function() {
+		com_framework_utils_Entity.prototype.die.call(this);
+		this.limboStart();
+	}
+	,limboStart: function() {
+		this.display.removeFromParent();
+		this.collision.removeFromParent();
+	}
+	,update: function(dt) {
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		this.currentTime += dt;
+		this.collision.update(dt);
+		this.display.x = this.collision.x;
+		this.display.y = this.collision.y;
+		if(this.currentTime >= this.lifeTime) {
+			this.die();
+		}
+	}
+	,dissapear: function(dt) {
+		if(this.lifeTime - this.currentTime < 1) {
+			this.display.scaleX = this.dirX * (this.lifeTime - this.currentTime);
+			this.display.scaleY = this.lifeTime - this.currentTime;
+			var tmp = this.display.width();
+			this.collision.width = tmp * Math.abs(this.display.scaleX);
+			var tmp1 = this.display.height();
+			this.collision.height = tmp1 * this.display.scaleY;
+		}
+	}
+	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		this.display.scaleX = dirX;
+		this.display.scaleY = 1;
+		this.collision.width = this.display.width();
+		this.collision.height = this.display.height();
+		this.dirX = dirX;
+		this.currentTime = 0;
+		this.collision.x = x;
+		this.collision.y = y;
+		var tmp = this.display.width() / 4;
+		var tmp1 = dirX * this.display.width() / 4;
+		this.display.offsetX = tmp - tmp1;
+		var tmp2 = this.display.width();
+		this.display.pivotX = tmp2 * 0.25;
+		this.display.set_smooth(false);
+		this.collision.velocityX = this.speed * this.display.scaleX;
+		this.collision.velocityY = 0;
+		GlobalGameData.simulationLayer.addChild(this.display);
+		this.display.timeline.playAnimation("idle");
+		this.display.timeline.frameRate = 0.1;
+	}
+	,__class__: gameObjects_Proyectile
+});
 var gameObjects_Torch = function(layer,collisions,x,y) {
 	com_framework_utils_Entity.call(this);
 	this.display = new com_gEngine_display_Sprite("torch");
@@ -9998,73 +9928,31 @@ gameObjects_Torch.prototype = $extend(com_framework_utils_Entity.prototype,{
 	,__class__: gameObjects_Torch
 });
 var gameObjects_effects_BlueFireball = function() {
-	this.hitDamage = 30;
-	this.currentTime = 0;
-	this.lifeTime = 4;
-	com_framework_utils_Entity.call(this);
-	this.collision = new com_collision_platformer_CollisionBox();
 	this.display = new com_gEngine_display_Sprite("blueFireball");
-	var tmp = this.display.width();
-	this.collision.width = tmp / 2;
-	var tmp1 = this.display.height();
-	this.collision.height = tmp1 / 2;
-	this.collision.userData = this;
+	gameObjects_Proyectile.call(this);
+	this.hitDamage = 30;
+	this.speed = 300;
 };
 $hxClasses["gameObjects.effects.BlueFireball"] = gameObjects_effects_BlueFireball;
 gameObjects_effects_BlueFireball.__name__ = "gameObjects.effects.BlueFireball";
-gameObjects_effects_BlueFireball.__super__ = com_framework_utils_Entity;
-gameObjects_effects_BlueFireball.prototype = $extend(com_framework_utils_Entity.prototype,{
-	get_hitDamage: function() {
-		return this.hitDamage;
-	}
-	,die: function() {
-		com_framework_utils_Entity.prototype.die.call(this);
-		this.limboStart();
-	}
-	,limboStart: function() {
-		this.display.removeFromParent();
-		this.collision.removeFromParent();
+gameObjects_effects_BlueFireball.__super__ = gameObjects_Proyectile;
+gameObjects_effects_BlueFireball.prototype = $extend(gameObjects_Proyectile.prototype,{
+	shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		this.display = new com_gEngine_display_Sprite("blueFireball");
+		gameObjects_Proyectile.prototype.shoot.call(this,x,y,dirX,dirY,proyectileCollision);
+		this.dirX = -dirX;
+		this.display.scaleX = this.dirX;
+		this.currentTime = 0;
+		var tmp = this.display.width() / 2;
+		var tmp1 = this.display.scaleX * 0.5 * (this.display.width() / 2);
+		this.display.offsetX = tmp - tmp1;
+		this.display.set_smooth(false);
+		GlobalGameData.playerProyectilesCollisions.add(this.collision);
 	}
 	,update: function(dt) {
-		com_framework_utils_Entity.prototype.update.call(this,dt);
-		this.currentTime += dt;
+		gameObjects_Proyectile.prototype.update.call(this,dt);
 		this.collision.update(dt);
-		this.display.x = this.collision.x;
-		this.display.y = this.collision.y;
-		if(this.lifeTime - this.currentTime < 1) {
-			this.display.scaleX = this.dirX * (this.lifeTime - this.currentTime);
-			this.display.scaleY = this.lifeTime - this.currentTime;
-			var tmp = this.display.width();
-			this.collision.width = tmp * Math.abs(this.display.scaleX);
-			var tmp1 = this.display.height();
-			this.collision.height = tmp1 * this.display.scaleY;
-		}
-		if(this.currentTime >= this.lifeTime) {
-			this.die();
-		}
-	}
-	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
-		this.display = new com_gEngine_display_Sprite("blueFireball");
-		this.display.scaleX = dirX * -0.333333333333333315 * 2;
-		this.display.scaleY = 0.66666666666666663;
-		var tmp = this.display.width() * 2;
-		this.collision.width = tmp / 3;
-		var tmp1 = this.display.height() * 2 / 3;
-		this.collision.height = tmp1 + 5;
-		this.dirX = dirX;
-		this.currentTime = 0;
-		this.collision.x = x;
-		this.collision.y = y;
-		var tmp2 = this.display.width() / 3;
-		var tmp3 = this.display.scaleX * 3 / 2 * (this.display.width() / 3);
-		this.display.offsetX = tmp2 - tmp3;
-		this.display.set_smooth(false);
-		this.collision.velocityX = 300 * dirX;
-		this.collision.velocityY = 0;
-		GlobalGameData.playerProyectilesCollisions.add(this.collision);
-		GlobalGameData.simulationLayer.addChild(this.display);
-		this.display.timeline.playAnimation("idle");
-		this.display.timeline.frameRate = 0.1;
+		gameObjects_Proyectile.prototype.dissapear.call(this,dt);
 	}
 	,__class__: gameObjects_effects_BlueFireball
 });
@@ -10100,7 +9988,7 @@ gameObjects_effects_Confusion.prototype = $extend(gameObjects_Effect.prototype,{
 });
 var gameObjects_effects_RangeAttack = function(player) {
 	this.currentTime = 0;
-	this.cooldown = 4;
+	this.cooldown = 1;
 	this.shooted = false;
 	this.inCooldown = false;
 	gameObjects_Effect.call(this,player);
@@ -10138,73 +10026,268 @@ gameObjects_effects_RangeAttack.prototype = $extend(gameObjects_Effect.prototype
 	}
 	,__class__: gameObjects_effects_RangeAttack
 });
-var gameObjects_enemyMinions_Fireball = function() {
-	this.hitDamage = 60;
-	this.currentTime = 0;
-	this.lifeTime = 4;
+var gameObjects_enemyMinions_ArmGun = function(enemyProyectilesCollisions,bossWidth,bossHeight) {
+	this.xRange = 300;
 	com_framework_utils_Entity.call(this);
+	this.pool = true;
+	this.proyectilesCollisions = enemyProyectilesCollisions;
+	this.bossWidth = bossWidth;
+	this.bossHeight = bossHeight;
+};
+$hxClasses["gameObjects.enemyMinions.ArmGun"] = gameObjects_enemyMinions_ArmGun;
+gameObjects_enemyMinions_ArmGun.__name__ = "gameObjects.enemyMinions.ArmGun";
+gameObjects_enemyMinions_ArmGun.__super__ = com_framework_utils_Entity;
+gameObjects_enemyMinions_ArmGun.prototype = $extend(com_framework_utils_Entity.prototype,{
+	shoot: function(aX,aY,dirX,dirY) {
+		var firebeam = this.recycle(gameObjects_enemyMinions_Firebeam);
+		firebeam.setBossSize(this.bossWidth,this.bossHeight);
+		firebeam.shoot(aX,aY,dirX,dirY,this.proyectilesCollisions);
+	}
+	,stomp: function(aX,aY,dirX,dirY,times) {
+		var _g = 0;
+		while(_g < times) {
+			++_g;
+			var meteor = this.recycle(gameObjects_enemyMinions_Meteor);
+			var randomX = aX - this.xRange + Math.ceil(Math.random() * 600);
+			meteor.shoot(randomX,0,0,dirY,this.proyectilesCollisions);
+		}
+	}
+	,__class__: gameObjects_enemyMinions_ArmGun
+});
+var gameObjects_enemyMinions_Boss = function(layer,collisions,endGateCollision,bossCurrentHpBar,x,y,enemyProyectilesCollisions) {
+	this.shoot = false;
+	this.walkLeft = false;
+	this.standTimeCounter = 0;
+	this.walkTimeCounter = 2;
+	this.walkTime = 2;
+	this.timeBetweenAtacksCounter = 0;
+	this.timeBetweenAtacks = 2;
+	gameObjects_EnemyMinion.call(this,layer,collisions,x,y);
+	this.hitDamage = 10;
+	this.endGateCollision = endGateCollision;
+	this.hpBarMaxSize = bossCurrentHpBar.scaleX;
+	this.bossCurrentHpBar = bossCurrentHpBar;
+	this.simulationlayer = layer;
+	this.scorePoints = this.currentHp = this.hpMax = 1000;
+	this.display = new com_gEngine_display_Sprite("boss");
+	this.agressionRange = 20000;
+	this.armGun = new gameObjects_enemyMinions_ArmGun(enemyProyectilesCollisions,this.display.width(),this.display.height());
+	this.addChild(this.armGun);
+	layer.addChild(this.display);
+	this.display.timeline.frameRate = 0.1;
+	this.display.timeline.playAnimation("idle");
+	this.display.offsetY = -20;
+	this.display.offsetX = -40;
+	var tmp = this.display.width();
+	this.display.pivotX = tmp * 0.27;
+	this.display.set_smooth(true);
+	var tmp1 = this.display.width();
+	this.collision.width = tmp1 / 2;
+	var tmp2 = this.display.height();
+	this.collision.height = tmp2 - 20;
+	this.collision.accelerationY = GlobalGameData.gravity;
+};
+$hxClasses["gameObjects.enemyMinions.Boss"] = gameObjects_enemyMinions_Boss;
+gameObjects_enemyMinions_Boss.__name__ = "gameObjects.enemyMinions.Boss";
+gameObjects_enemyMinions_Boss.__super__ = gameObjects_EnemyMinion;
+gameObjects_enemyMinions_Boss.prototype = $extend(gameObjects_EnemyMinion.prototype,{
+	get_hitDamage: function() {
+		return gameObjects_EnemyMinion.prototype.get_hitDamage.call(this);
+	}
+	,update: function(dt) {
+		this.collision.update(dt);
+		gameObjects_EnemyMinion.prototype.update.call(this,dt);
+		if(this.bossCurrentHpBar != null) {
+			this.bossCurrentHpBar.scaleX = this.currentHp * this.hpBarMaxSize / this.hpMax;
+			if(this.bossCurrentHpBar.scaleX <= 0) {
+				this.bossCurrentHpBar.scaleX = 0;
+			}
+		}
+		if(this.display.timeline.currentAnimation == "attack2") {
+			haxe_Log.trace(this.display.timeline.currentFrame,{ fileName : "gameObjects/enemyMinions/Boss.hx", lineNumber : 70, className : "gameObjects.enemyMinions.Boss", methodName : "update"});
+		}
+		if(this.display.timeline.currentFrame == 102 && !this.shoot) {
+			this.armGun.shoot(this.get_x(),this.get_y() - this.display.height() / 2,this.display.scaleX,0);
+			this.shoot = true;
+		}
+		if(this.display.timeline.currentFrame == 89 && !this.shoot) {
+			this.armGun.stomp(this.target.get_x(),this.get_y() - this.display.height() / 2,this.display.scaleX,0,6);
+			this.shoot = true;
+		}
+	}
+	,damage: function(damageReceived) {
+		if(damageReceived == 0) {
+			return;
+		}
+		if(this.lastDamageReceived != damageReceived) {
+			this.currentHp -= damageReceived;
+			if(this.currentHp <= 0) {
+				this.addPoints();
+				this.display.timeline.playAnimation("die",false);
+				this.collision.velocityX = this.collision.velocityY = 0;
+				this.collision.accelerationY = this.collision.accelerationX = 0;
+				this.collision.removeFromParent();
+			} else {
+				this.display.timeline.playAnimation("hurt",false);
+				this.stunned = true;
+				this.timeCounter = 0;
+			}
+			this.lastDamageReceived = damageReceived;
+		}
+	}
+	,aggresiveStance: function(dt) {
+		var x = this.target.get_x() - (this.collision.x + this.collision.width * 0.5);
+		var y = this.target.get_y() - (this.collision.y + this.collision.height * 1.5);
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		this.collision.velocityX = 0;
+		if(this.target.get_x() - this.collision.x > 0) {
+			this.display.scaleX = 1;
+		} else {
+			this.display.scaleX = -1;
+		}
+		if(this.timeBetweenAtacks <= this.timeBetweenAtacksCounter) {
+			this.attack();
+			this.timeBetweenAtacksCounter = 0;
+		} else {
+			this.timeBetweenAtacksCounter += dt;
+		}
+	}
+	,attack: function() {
+		if(this.display.timeline.currentAnimation != "attack") {
+			this.display.timeline.frameRate = 0.05;
+			this.display.timeline.playAnimation("attack2",false);
+			this.shoot = false;
+		}
+	}
+	,passiveStance: function(dt) {
+		this.timeBetweenAtacksCounter = this.timeBetweenAtacks;
+		if(this.standTimeCounter < this.walkTime) {
+			this.collision.velocityX = 0;
+			this.standTimeCounter += dt;
+			if(this.standTimeCounter > this.walkTime) {
+				this.walkTimeCounter = 0;
+				this.walkLeft = !this.walkLeft;
+			}
+		}
+		if(this.walkTimeCounter < this.walkTime) {
+			if(this.walkLeft) {
+				this.collision.velocityX = -50;
+			} else {
+				this.collision.velocityX = 50;
+			}
+			this.walkTimeCounter += dt;
+			if(this.walkTimeCounter > this.walkTime) {
+				this.standTimeCounter = 0;
+			}
+		}
+	}
+	,die: function() {
+		gameObjects_EnemyMinion.prototype.die.call(this);
+		var endGate = new gameObjects_EndGate(this.simulationlayer,this.endGateCollision,gameObjects_enemyMinions_Boss.gateOutX,gameObjects_enemyMinions_Boss.gateOutY);
+		this.addChild(endGate);
+	}
+	,render: function() {
+		this.display.x = this.collision.x + this.collision.width * 0.5;
+		this.display.y = this.collision.y;
+		if(this.display.timeline.currentAnimation == "die") {
+			return;
+		}
+		if(this.stunned) {
+			this.display.colorMultiplication(1,1,1,1);
+			return;
+		}
+		var tmp;
+		if(this.display.timeline.currentAnimation == "attack" || this.display.timeline.currentAnimation == "attack2") {
+			var _this = this.display.timeline;
+			tmp = !(!_this.playing && !_this.loop);
+		} else {
+			tmp = false;
+		}
+		if(tmp) {
+			return;
+		}
+		this.display.timeline.frameRate = 0.1;
+		if(this.target.get_x() - this.collision.x > 0) {
+			this.display.scaleX = 1;
+			this.display.timeline.playAnimation("idle");
+		} else {
+			this.display.scaleX = -1;
+			this.display.timeline.playAnimation("idle");
+		}
+		gameObjects_EnemyMinion.prototype.render.call(this);
+	}
+	,__class__: gameObjects_enemyMinions_Boss
+});
+var gameObjects_enemyMinions_Fireball = function() {
 	this.display = new com_gEngine_display_Sprite("fireball");
-	this.collision = new com_collision_platformer_CollisionBox();
-	this.collision.width = this.display.width();
-	this.collision.height = this.display.height();
-	this.collision.userData = this;
+	gameObjects_Proyectile.call(this);
+	this.speed = 100;
 };
 $hxClasses["gameObjects.enemyMinions.Fireball"] = gameObjects_enemyMinions_Fireball;
 gameObjects_enemyMinions_Fireball.__name__ = "gameObjects.enemyMinions.Fireball";
-gameObjects_enemyMinions_Fireball.__super__ = com_framework_utils_Entity;
-gameObjects_enemyMinions_Fireball.prototype = $extend(com_framework_utils_Entity.prototype,{
-	get_hitDamage: function() {
-		return this.hitDamage;
+gameObjects_enemyMinions_Fireball.__super__ = gameObjects_Proyectile;
+gameObjects_enemyMinions_Fireball.prototype = $extend(gameObjects_Proyectile.prototype,{
+	update: function(dt) {
+		gameObjects_Proyectile.prototype.update.call(this,dt);
+		this.collision.update(dt);
+		gameObjects_Proyectile.prototype.dissapear.call(this,dt);
 	}
-	,die: function() {
-		com_framework_utils_Entity.prototype.die.call(this);
-		this.limboStart();
+	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		gameObjects_Proyectile.prototype.shoot.call(this,x,y,dirX,dirY,proyectileCollision);
+		GlobalGameData.enemyProyectilesCollisions.add(this.collision);
 	}
-	,limboStart: function() {
-		this.display.removeFromParent();
-		this.collision.removeFromParent();
+	,__class__: gameObjects_enemyMinions_Fireball
+});
+var gameObjects_enemyMinions_Firebeam = function() {
+	this.display = new com_gEngine_display_Sprite("beam");
+	gameObjects_Proyectile.call(this);
+	this.speed = 2000;
+	this.lifeTime = 1.7;
+};
+$hxClasses["gameObjects.enemyMinions.Firebeam"] = gameObjects_enemyMinions_Firebeam;
+gameObjects_enemyMinions_Firebeam.__name__ = "gameObjects.enemyMinions.Firebeam";
+gameObjects_enemyMinions_Firebeam.__super__ = gameObjects_Proyectile;
+gameObjects_enemyMinions_Firebeam.prototype = $extend(gameObjects_Proyectile.prototype,{
+	setBossSize: function(bossWidth,bossHeight) {
+		this.bossHeight = bossHeight;
+		this.bossWidth = bossWidth;
+	}
+	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		gameObjects_Proyectile.prototype.shoot.call(this,x,y,dirX,dirY,proyectileCollision);
+		GlobalGameData.enemyProyectilesCollisions.add(this.collision);
+		this.collision.velocityX = 0;
+		this.display.offsetX = 0;
+		this.display.pivotX = 0;
+		if(dirX > 0) {
+			this.collision.x = x - (this.bossWidth / 3 - dirX * this.bossWidth / 3 - this.bossWidth / 2);
+		} else {
+			this.collision.x = x - (this.bossWidth / 3 - dirX * this.bossWidth / 3 - this.bossWidth / 5);
+		}
+		this.collision.y = y - this.bossHeight * 0.1;
 	}
 	,update: function(dt) {
-		com_framework_utils_Entity.prototype.update.call(this,dt);
 		this.currentTime += dt;
+		gameObjects_Proyectile.prototype.update.call(this,dt);
 		this.collision.update(dt);
-		this.display.x = this.collision.x;
-		this.display.y = this.collision.y;
-		if(this.lifeTime - this.currentTime < 1) {
-			this.display.scaleX = this.dirX * (this.lifeTime - this.currentTime);
-			this.display.scaleY = this.lifeTime - this.currentTime;
-			var tmp = this.display.width();
-			this.collision.width = tmp * Math.abs(this.display.scaleX);
-			var tmp1 = this.display.height();
-			this.collision.height = tmp1 * this.display.scaleY;
+		if(GlobalGameData.player.get_y() >= this.collision.y) {
+			if(GlobalGameData.player.get_x() > this.collision.x + this.collision.width && GlobalGameData.player.get_x() < this.collision.x) {
+				GlobalGameData.player.damage(this.get_hitDamage());
+			}
 		}
+		this.display.scaleX += this.dirX * 0.1;
+		var tmp = this.display.width();
+		this.collision.width = tmp * this.display.scaleX;
+		this.display.x = this.collision.x + this.dirX * this.display.offsetX;
 		if(this.currentTime >= this.lifeTime) {
 			this.die();
 		}
 	}
-	,shoot: function(x,y,dirX,dirY,proyectileCollision) {
-		this.display.scaleX = dirX;
-		this.display.scaleY = 1;
-		this.collision.width = this.display.width();
-		this.collision.height = this.display.height();
-		this.dirX = dirX;
-		this.currentTime = 0;
-		this.collision.x = x;
-		this.collision.y = y;
-		var tmp = this.display.width() / 4;
-		var tmp1 = dirX * this.display.width() / 4;
-		this.display.offsetX = tmp - tmp1;
-		var tmp2 = this.display.width();
-		this.display.pivotX = tmp2 * 0.25;
-		this.display.set_smooth(false);
-		this.collision.velocityX = 150 * this.display.scaleX;
-		this.collision.velocityY = 0;
-		proyectileCollision.add(this.collision);
-		GlobalGameData.simulationLayer.addChild(this.display);
-		this.display.timeline.playAnimation("idle");
-		this.display.timeline.frameRate = 0.1;
-	}
-	,__class__: gameObjects_enemyMinions_Fireball
+	,__class__: gameObjects_enemyMinions_Firebeam
 });
 var gameObjects_enemyMinions_Firebreath = function(enemyProyectilesCollisions) {
 	com_framework_utils_Entity.call(this);
@@ -10353,6 +10436,22 @@ gameObjects_enemyMinions_Ghost.prototype = $extend(gameObjects_EnemyMinion.proto
 		gameObjects_EnemyMinion.prototype.render.call(this);
 	}
 	,__class__: gameObjects_enemyMinions_Ghost
+});
+var gameObjects_enemyMinions_Meteor = function() {
+	this.display = new com_gEngine_display_Sprite("meteor");
+	gameObjects_Proyectile.call(this);
+};
+$hxClasses["gameObjects.enemyMinions.Meteor"] = gameObjects_enemyMinions_Meteor;
+gameObjects_enemyMinions_Meteor.__name__ = "gameObjects.enemyMinions.Meteor";
+gameObjects_enemyMinions_Meteor.__super__ = gameObjects_Proyectile;
+gameObjects_enemyMinions_Meteor.prototype = $extend(gameObjects_Proyectile.prototype,{
+	shoot: function(x,y,dirX,dirY,proyectileCollision) {
+		gameObjects_Proyectile.prototype.shoot.call(this,x,y,dirX,dirY,proyectileCollision);
+		GlobalGameData.enemyProyectilesCollisions.add(this.collision);
+		this.collision.velocityX = 0;
+		this.collision.accelerationY = GlobalGameData.gravity / 2;
+	}
+	,__class__: gameObjects_enemyMinions_Meteor
 });
 var gameObjects_enemyMinions_Salamander = function(layer,collisions,x,y,enemyProyectilesCollisions) {
 	this.shoot = false;
@@ -12923,12 +13022,14 @@ var kha__$Assets_ImageList = function() {
 	this.victory = null;
 	this.torchDescription = { name : "torch", original_height : 150, file_sizes : [6376], original_width : 145, files : ["torch.png"], type : "image"};
 	this.torch = null;
-	this.tiles2Description = { name : "tiles2", original_height : 128, file_sizes : [1967], original_width : 160, files : ["tiles2.png"], type : "image"};
+	this.tiles2Description = { name : "tiles2", original_height : 416, file_sizes : [1967], original_width : 32, files : ["tiles2.png"], type : "image"};
 	this.tiles2 = null;
 	this.skyBackgroundDescription = { name : "skyBackground", original_height : 800, file_sizes : [230111], original_width : 1600, files : ["skyBackground.png"], type : "image"};
 	this.skyBackground = null;
 	this.salamanderDescription = { name : "salamander", original_height : 160, file_sizes : [10351], original_width : 420, files : ["salamander.png"], type : "image"};
 	this.salamander = null;
+	this.meteorDescription = { name : "meteor", original_height : 40, file_sizes : [14486], original_width : 252, files : ["meteor.png"], type : "image"};
+	this.meteor = null;
 	this.logoDescription = { name : "logo", original_height : 149, file_sizes : [25056], original_width : 200, files : ["logo.png"], type : "image"};
 	this.logoName = "logo";
 	this.logo = null;
@@ -12947,8 +13048,12 @@ var kha__$Assets_ImageList = function() {
 	this.fireball = null;
 	this.caveDescription = { name : "cave", original_height : 800, file_sizes : [605657], original_width : 868, files : ["cave.png"], type : "image"};
 	this.cave = null;
-	this.blueFireballDescription = { name : "blueFireball", original_height : 25, file_sizes : [13162], original_width : 272, files : ["blueFireball.png"], type : "image"};
+	this.bossDescription = { name : "boss", original_height : 1100, file_sizes : [253292], original_width : 1400, files : ["boss.png"], type : "image"};
+	this.boss = null;
+	this.blueFireballDescription = { name : "blueFireball", original_height : 17, file_sizes : [7882], original_width : 184, files : ["blueFireball.png"], type : "image"};
 	this.blueFireball = null;
+	this.beamDescription = { name : "beam", original_height : 34, file_sizes : [2230], original_width : 140, files : ["beam.png"], type : "image"};
+	this.beam = null;
 	this.avatarDescription = { name : "avatar", original_height : 21, file_sizes : [658], original_width : 21, files : ["avatar.png"], type : "image"};
 	this.avatar = null;
 };
@@ -12965,7 +13070,7 @@ var kha__$Assets_BlobList = function() {
 	this.yo_tsx = null;
 	this.sand_tsxDescription = { name : "sand_tsx", file_sizes : [228], files : ["sand.tsx"], type : "blob"};
 	this.sand_tsx = null;
-	this.level3_tmxDescription = { name : "level3_tmx", file_sizes : [3907], files : ["level3.tmx"], type : "blob"};
+	this.level3_tmxDescription = { name : "level3_tmx", file_sizes : [3731], files : ["level3.tmx"], type : "blob"};
 	this.level3_tmx = null;
 	this.level2_tmxDescription = { name : "level2_tmx", file_sizes : [8761], files : ["level2.tmx"], type : "blob"};
 	this.level2_tmx = null;
@@ -25513,18 +25618,20 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 		levelDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
 		levelDisplay.setColorMultiply(0.392156862745098034,0.0784313725490196,0.392156862745098034,1);
 		scoreDisplay.scaleX = scoreDisplay.scaleY = 0.66666666666666663;
-		var avatar = new com_gEngine_display_Sprite("avatar");
-		avatar.set_smooth(true);
-		avatar.x = image.x + image.width() / 2 - avatar.width() * 3;
-		avatar.y = image.y + image.height() - avatar.width();
-		avatar.scaleX = avatar.scaleY = 3;
-		this.simulationLayer.addChild(avatar);
-		var continues = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		continues.x = avatar.x + avatar.width() * 3;
-		continues.y = image.y + image.height() + 10;
-		continues.scaleX = continues.scaleY = 0.5;
-		continues.set_text("x" + GlobalGameData.continues);
-		this.simulationLayer.addChild(continues);
+		if(GlobalGameData.continues >= 0) {
+			var avatar = new com_gEngine_display_Sprite("avatar");
+			avatar.set_smooth(true);
+			avatar.x = image.x + image.width() / 2 - avatar.width() * 3;
+			avatar.y = image.y + image.height() - avatar.width();
+			avatar.scaleX = avatar.scaleY = 3;
+			this.simulationLayer.addChild(avatar);
+			var continues = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+			continues.x = avatar.x + avatar.width() * 3;
+			continues.y = image.y + image.height() + 10;
+			continues.scaleX = continues.scaleY = 0.5;
+			continues.set_text("x" + GlobalGameData.continues);
+			this.simulationLayer.addChild(continues);
+		}
 		this.stage.addChild(scoreDisplay);
 		this.stage.addChild(levelDisplay);
 		this.playDeadAnimation();
@@ -25554,9 +25661,9 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 	,__class__: states_GameOver
 });
 var states_GameState = function(level,fromRoom) {
+	this.debugging = false;
 	com_framework_utils_State.call(this);
 	this.level = level;
-	haxe_Log.trace(level,{ fileName : "states/GameState.hx", lineNumber : 70, className : "states.GameState", methodName : "new"});
 };
 $hxClasses["states.GameState"] = states_GameState;
 states_GameState.__name__ = "states.GameState";
@@ -25564,7 +25671,7 @@ states_GameState.__super__ = com_framework_utils_State;
 states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	load: function(resources) {
 		resources.add(new com_loading_basicResources_DataLoader("level" + this.level + "_tmx"));
-		var atlas = new com_loading_basicResources_JoinAtlas(2048,2048);
+		var atlas = new com_loading_basicResources_JoinAtlas(4096,4096);
 		atlas.add(new com_loading_basicResources_TilesheetLoader("tiles2",32,32,0));
 		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.PixelOperator8_BoldName,30));
 		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.Kenney_PixelName,24));
@@ -25574,11 +25681,14 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		atlas.add(new com_loading_basicResources_ImageLoader("avatar"));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("ghost",60,60,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]),new com_loading_basicResources_Sequence("die",[24,25,26,27,28,28,29,30,31,32,33,34,35,36,37,38,39,40]),new com_loading_basicResources_Sequence("slide",[61,61]),new com_loading_basicResources_Sequence("hurt",[60])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("gate",50,85,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("beam",140,34,0,[new com_loading_basicResources_Sequence("idle",[0])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("torch",29,75,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8,9])]));
-		atlas.add(new com_loading_basicResources_SpriteSheetLoader("blueFireball",34,25,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("blueFireball",23,17,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("meteor",28,40,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6,7,8])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("salamander",60,40,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5]),new com_loading_basicResources_Sequence("walk",[6,7,8,9,10,11,12,13]),new com_loading_basicResources_Sequence("attack",[17,18,19,20,21,22,23,24,25,26]),new com_loading_basicResources_Sequence("die",[14,15,16]),new com_loading_basicResources_Sequence("hurt",[14,15])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("fireball",33,25,0,[new com_loading_basicResources_Sequence("idle",[0,1])]));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader("hero",60,60,0,[new com_loading_basicResources_Sequence("fall",[14,15]),new com_loading_basicResources_Sequence("slide",[58]),new com_loading_basicResources_Sequence("jump",[13]),new com_loading_basicResources_Sequence("rangeAttack",[49,50,51,52,49]),new com_loading_basicResources_Sequence("attack1",[32,33,34]),new com_loading_basicResources_Sequence("attack2",[36,37,38,39]),new com_loading_basicResources_Sequence("attack3",[40,41,42,43,44]),new com_loading_basicResources_Sequence("run",[4,5,6,7,8,9,10,11]),new com_loading_basicResources_Sequence("idle",[0,1,2,3,2,1]),new com_loading_basicResources_Sequence("heavyDamage",[19,20,21,22,23]),new com_loading_basicResources_Sequence("damage",[25,26,27]),new com_loading_basicResources_Sequence("rangeAttack",[11])]));
+		atlas.add(new com_loading_basicResources_SpriteSheetLoader("boss",140,100,0,[new com_loading_basicResources_Sequence("idle",[0,1,2,3,4,5,6]),new com_loading_basicResources_Sequence("die",[21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49]),new com_loading_basicResources_Sequence("appear",[7,8,9,10,11,12,13,14,15,16,17,18,19,20]),new com_loading_basicResources_Sequence("disappear",[20,19,18,17,16,15,14,13,12,11,10,9,8,7]),new com_loading_basicResources_Sequence("hurt",[18]),new com_loading_basicResources_Sequence("attack2",[80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103]),new com_loading_basicResources_Sequence("attack",[50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79])]));
 		resources.add(atlas);
 	}
 	,init: function() {
@@ -25595,6 +25705,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		this.simulationLayer = new com_gEngine_display_Layer();
 		this.stage.addChild(this.simulationLayer);
 		this.enemiesCollisions = new com_collision_platformer_CollisionGroup();
+		this.bossCollisions = new com_collision_platformer_CollisionGroup();
 		GlobalGameData.simulationLayer = this.simulationLayer;
 		if(GlobalGameData.player != null) {
 			this.player = GlobalGameData.player;
@@ -25603,6 +25714,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 			this.player = new gameObjects_Player(100,100,this.simulationLayer);
 			GlobalGameData.player = this.player;
 		}
+		this.hudLayer = new com_gEngine_display_StaticLayer();
 		this.worldMap = new com_collision_platformer_Tilemap("level" + this.level + "_tmx",1);
 		this.worldMap.init(function(layerTilemap,tileLayer) {
 			if(tileLayer.properties.exists("damage")) {
@@ -25633,7 +25745,6 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		this.stage.cameras[0].limits(0,0,this.worldMap.widthIntTiles * 32,this.worldMap.heightInTiles * 32);
 		this.addChild(this.player);
 		this.createTouchJoystick();
-		this.hudLayer = new com_gEngine_display_StaticLayer();
 		this.stage.addChild(this.hudLayer);
 		this.hpBarTotal = new com_gEngine_helper_RectangleDisplay();
 		this.hpBarTotal.x = 100;
@@ -25700,8 +25811,21 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 				this.addChild(endGate);
 			}
 			if(object.type == "boss") {
-				var endGate1 = new gameObjects_Boss(this.simulationLayer,this.enemiesCollisions,this.endGateCollisions,object.x,object.y);
-				this.addChild(endGate1);
+				this.bossHpBarTotal = new com_gEngine_helper_RectangleDisplay();
+				this.bossHpBarTotal.x = 100;
+				this.bossHpBarTotal.y = com_gEngine_GEngine.virtualHeight * 0.95;
+				this.bossHpBarTotal.scaleX = com_gEngine_GEngine.virtualWidth - 200;
+				this.bossHpBarTotal.scaleY = 25;
+				this.hudLayer.addChild(this.bossHpBarTotal);
+				this.bossCurrentHpBar = new com_gEngine_helper_RectangleDisplay();
+				this.bossCurrentHpBar.x = 102;
+				this.bossCurrentHpBar.y = com_gEngine_GEngine.virtualHeight * 0.95 + 2;
+				this.bossCurrentHpBar.scaleX = this.bossHpBarTotal.scaleX - 4;
+				this.bossCurrentHpBar.scaleY = 21;
+				this.bossCurrentHpBar.setColor(255,0,0);
+				this.hudLayer.addChild(this.bossCurrentHpBar);
+				var boss = new gameObjects_enemyMinions_Boss(this.simulationLayer,this.bossCollisions,this.endGateCollisions,this.bossCurrentHpBar,object.x,object.y,this.enemyProyectilesCollisions);
+				this.addChild(boss);
 			}
 			if(object.type == "gate") {
 				var gate = new gameObjects_Gate(this.simulationLayer,this.secretGateCollisions,object.x,object.y,parseFloat(object.properties.getString("destinyX")),parseFloat(object.properties.getString("destinyY")));
@@ -25731,6 +25855,12 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	}
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
+		if(com_framework_utils_Input.i.isKeyCodePressed(84)) {
+			this.debugging = !this.debugging;
+		}
+		if(GlobalGameData.player.currentHp <= 0) {
+			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
+		}
 		this.stage.cameras[0].scale = 2;
 		this.scoreLevelDisplay.set_text("Score: " + GlobalGameData.score + " - Level: " + GlobalGameData.level);
 		this.currentHpBar.scaleX = this.player.currentHp * 296 / this.player.maxHp;
@@ -25739,6 +25869,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		}
 		com_collision_platformer_CollisionEngine.collide(this.player.collision,this.worldMap.collision);
 		com_collision_platformer_CollisionEngine.collide(this.enemiesCollisions,this.worldMap.collision);
+		com_collision_platformer_CollisionEngine.collide(this.bossCollisions,this.worldMap.collision);
 		com_collision_platformer_CollisionEngine.collide(this.torchCollisions,this.worldMap.collision);
 		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.damageMap.collision,$bind(this,this.playerVsDamage));
 		if(this.secretGateCollisions != null) {
@@ -25748,15 +25879,18 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 			com_collision_platformer_CollisionEngine.collide(this.endGateCollisions,this.worldMap.collision);
 		}
 		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.enemiesCollisions,$bind(this,this.playerVsEnemy));
+		com_collision_platformer_CollisionEngine.overlap(this.player.collision,this.bossCollisions,$bind(this,this.playerVsEnemy));
 		this.secretGateCollisions.overlap(this.player.collision,$bind(this,this.playerVsScertGate));
 		this.endGateCollisions.overlap(this.player.collision,$bind(this,this.playerVsEndGate));
 		this.torchCollisions.overlap(this.player.collision,$bind(this,this.playerVsTorch));
 		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.enemyProyectilesCollisions,this.enemiesCollisions);
 		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.playerProyectilesCollisions,this.enemiesCollisions,$bind(this,this.proyectilesVsEnemy));
-		GlobalGameData.enemyProyectilesCollisions.overlap(this.player.collision,$bind(this,this.enemyProyectileVsPlayer));
+		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.playerProyectilesCollisions,this.bossCollisions,$bind(this,this.proyectilesVsEnemy));
+		com_collision_platformer_CollisionEngine.overlap(GlobalGameData.enemyProyectilesCollisions,this.player.collision,$bind(this,this.enemyProyectileVsPlayer));
 		com_collision_platformer_CollisionEngine.overlap(this.dialogCollision,this.player.collision,$bind(this,this.dialogVsPlayer));
 		if(this.player.hitCollision != null) {
 			com_collision_platformer_CollisionEngine.collide(this.player.hitCollision,this.enemiesCollisions,$bind(this,this.enemyVsPlayerHit));
+			com_collision_platformer_CollisionEngine.overlap(this.player.hitCollision,this.bossCollisions,$bind(this,this.enemyVsPlayerHit));
 		}
 		this.stage.cameras[0].setTarget(this.player.collision.x,this.player.collision.y);
 	}
@@ -25772,15 +25906,9 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,playerVsEnemy: function(enemiesCollisions,playerCollision) {
 		var enemy = enemiesCollisions.userData;
 		this.player.damage(enemy.get_hitDamage());
-		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
-		}
 	}
 	,playerVsDamage: function(enemiesCollisions,playerCollision) {
 		this.player.damage(100);
-		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
-		}
 	}
 	,playerVsScertGate: function(secretGate,playerCollision) {
 		var secretGate1 = secretGate.userData;
@@ -25801,14 +25929,13 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,enemyProyectileVsPlayer: function(aProyectile,aPlayer) {
 		var proyectile = aProyectile.userData;
 		this.player.damage(proyectile.get_hitDamage());
-		if(this.player.currentHp <= 0) {
-			this.changeState(new states_GameOver("" + GlobalGameData.score,"hero",GlobalGameData.level));
-		}
 	}
 	,draw: function(framebuffer) {
-		com_framework_utils_State.prototype.draw.call(this,framebuffer);
-		var camera = this.stage.cameras[0];
-		com_collision_platformer_CollisionEngine.renderDebug(framebuffer,camera);
+		if(this.debugging) {
+			com_framework_utils_State.prototype.draw.call(this,framebuffer);
+			var camera = this.stage.cameras[0];
+			com_collision_platformer_CollisionEngine.renderDebug(framebuffer,camera);
+		}
 	}
 	,destroy: function() {
 		com_framework_utils_State.prototype.destroy.call(this);
@@ -25887,7 +26014,7 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		}
 	}
 	,startGame: function() {
-		this.changeState(new states_GameState(3 + ""));
+		this.changeState(new states_GameState("3"));
 	}
 	,__class__: states_IntroScreen
 });
@@ -26013,8 +26140,8 @@ com_gEngine_GEngine.extraInfo = "";
 com_soundLib_SoundManager.musicPosition = 0;
 com_soundLib_SoundManager.soundMuted = false;
 com_soundLib_SoundManager.musicMuted = false;
-gameObjects_Boss.gateOutX = 300;
-gameObjects_Boss.gateOutY = 600;
+gameObjects_enemyMinions_Boss.gateOutX = 300;
+gameObjects_enemyMinions_Boss.gateOutY = 600;
 haxe_Unserializer.DEFAULT_RESOLVER = new haxe__$Unserializer_DefaultResolver();
 haxe_Unserializer.BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%:";
 haxe_crypto_Base64.CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

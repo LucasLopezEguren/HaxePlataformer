@@ -111,6 +111,6 @@ class IntroScreen extends State {
 	}
 
 	function startGame() {
-		changeState(new GameState(3+''));
+		changeState(new GameState('3'));
 	}
 }

@@ -131,16 +131,28 @@
 			"original_height": 21
 		},
 		{
+			"name": "beam",
+			"files": [
+				"beam.png"
+			],
+			"file_sizes": [
+				2230
+			],
+			"type": "image",
+			"original_width": 140,
+			"original_height": 34
+		},
+		{
 			"name": "blueFireball",
 			"files": [
 				"blueFireball.png"
 			],
 			"file_sizes": [
-				13162
+				7882
 			],
 			"type": "image",
-			"original_width": 272,
-			"original_height": 25
+			"original_width": 184,
+			"original_height": 17
 		},
 		{
 			"name": "blurFragmentShader_frag",
@@ -229,6 +241,18 @@
 				}
 			],
 			"types": []
+		},
+		{
+			"name": "boss",
+			"files": [
+				"boss.png"
+			],
+			"file_sizes": [
+				253292
+			],
+			"type": "image",
+			"original_width": 1400,
+			"original_height": 1100
 		},
 		{
 			"name": "cave",
@@ -534,7 +558,7 @@
 				"level3.tmx"
 			],
 			"file_sizes": [
-				3907
+				3731
 			],
 			"type": "blob"
 		},
@@ -779,6 +803,18 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "meteor",
+			"files": [
+				"meteor.png"
+			],
+			"file_sizes": [
+				14486
+			],
+			"type": "image",
+			"original_width": 252,
+			"original_height": 40
 		},
 		{
 			"name": "mirage_frag",
@@ -2092,8 +2128,8 @@
 				1967
 			],
 			"type": "image",
-			"original_width": 160,
-			"original_height": 128
+			"original_width": 32,
+			"original_height": 416
 		},
 		{
 			"name": "torch",

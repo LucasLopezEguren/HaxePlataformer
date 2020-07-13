@@ -11,7 +11,7 @@ import com.collision.platformer.Sides;
 class RangeAttack extends Effect {
 	var inCooldown:Bool = false;
 	var shooted:Bool = false;
-	var cooldown:Float = 4;
+	var cooldown:Float = 1;
 	var currentTime:Float = 0;
 
 	public var proyectilesCollisions:CollisionGroup;

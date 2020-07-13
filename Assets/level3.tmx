@@ -13,12 +13,12 @@
   <image source="cave.png" trans="ff00ff" width="868" height="800"/>
  </tileset>
  <objectgroup id="4" name="gameInfo">
-  <object id="20" name="Boss" type="boss" x="1238.62" y="509.765" width="82.4301" height="145.337"/>
-  <object id="23" gid="15" x="-0.157191" y="801.305" width="1681.46" height="800">
+  <object id="23" gid="15" x="14.5197" y="797.643" width="1681.46" height="800">
    <properties>
     <property name="spriteName" value="cave"/>
    </properties>
   </object>
+  <object id="20" name="Boss" type="boss" x="438.18" y="488.073" width="82.4301" height="145.337"/>
  </objectgroup>
  <layer id="1" name="Tile Layer 1" width="53" height="23">
   <data encoding="csv">
