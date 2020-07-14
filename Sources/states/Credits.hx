@@ -80,7 +80,8 @@ class Credits extends State {
 		'\n' +
 		'\n' +
 		'\n Music & Sounds: Billie Elish, ' +
-		'\n Final Fantasy, GFX Sounds (YouTube)' +
+		'\n Final Fantasy, GFX Sounds (YouTube),' +
+		'\n The All-American Rejects' +
 		'\n' +
 		'\n' +
 		'\n' +
