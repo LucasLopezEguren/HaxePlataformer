@@ -131,6 +131,16 @@
 			"original_height": 21
 		},
 		{
+			"name": "background",
+			"files": [
+				"background.ogg"
+			],
+			"file_sizes": [
+				2661175
+			],
+			"type": "sound"
+		},
+		{
 			"name": "beam",
 			"files": [
 				"beam.png"
@@ -141,6 +151,16 @@
 			"type": "image",
 			"original_width": 140,
 			"original_height": 34
+		},
+		{
+			"name": "blueFire",
+			"files": [
+				"blueFire.ogg"
+			],
+			"file_sizes": [
+				25678
+			],
+			"type": "sound"
 		},
 		{
 			"name": "blueFireball",
@@ -255,6 +275,16 @@
 			"original_height": 1100
 		},
 		{
+			"name": "bossFight",
+			"files": [
+				"bossFight.ogg"
+			],
+			"file_sizes": [
+				522605
+			],
+			"type": "sound"
+		},
+		{
 			"name": "cave",
 			"files": [
 				"cave.png"
@@ -265,6 +295,16 @@
 			"type": "image",
 			"original_width": 868,
 			"original_height": 800
+		},
+		{
+			"name": "ff",
+			"files": [
+				"ff.ogg"
+			],
+			"file_sizes": [
+				753845
+			],
+			"type": "sound"
 		},
 		{
 			"name": "filmGrain_frag",
@@ -391,6 +431,16 @@
 			"type": "image",
 			"original_width": 231,
 			"original_height": 244
+		},
+		{
+			"name": "gameOver",
+			"files": [
+				"gameOver.ogg"
+			],
+			"file_sizes": [
+				24901
+			],
+			"type": "sound"
 		},
 		{
 			"name": "gate",
@@ -533,12 +583,22 @@
 			"original_height": 300
 		},
 		{
+			"name": "hit",
+			"files": [
+				"hit.ogg"
+			],
+			"file_sizes": [
+				11676
+			],
+			"type": "sound"
+		},
+		{
 			"name": "level1_tmx",
 			"files": [
 				"level1.tmx"
 			],
 			"file_sizes": [
-				7789
+				7815
 			],
 			"type": "blob"
 		},
@@ -917,6 +977,16 @@
 				}
 			],
 			"types": []
+		},
+		{
+			"name": "oof",
+			"files": [
+				"oof.ogg"
+			],
+			"file_sizes": [
+				7985
+			],
+			"type": "sound"
 		},
 		{
 			"name": "outline_frag",
@@ -1362,6 +1432,16 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "powerUp",
+			"files": [
+				"powerUp.ogg"
+			],
+			"file_sizes": [
+				86332
+			],
+			"type": "sound"
 		},
 		{
 			"name": "renderAreaTint_frag",
@@ -2118,6 +2198,16 @@
 			"type": "image",
 			"original_width": 1600,
 			"original_height": 800
+		},
+		{
+			"name": "success",
+			"files": [
+				"success.ogg"
+			],
+			"file_sizes": [
+				45366
+			],
+			"type": "sound"
 		},
 		{
 			"name": "tiles2",

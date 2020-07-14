@@ -13,6 +13,7 @@ class Firebeam extends Proyectile {
 		super();
 		speed = 2000;
 		lifeTime = 1.7;
+		hitDamage = 25;
 	}
 
 	public function setBossSize(bossWidth:Float, bossHeight:Float){

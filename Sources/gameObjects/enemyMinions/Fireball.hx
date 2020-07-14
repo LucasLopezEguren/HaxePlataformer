@@ -1,5 +1,7 @@
 package gameObjects.enemyMinions;
 
+import com.soundLib.SoundManager.SM;
+import kha.Assets;
 import com.gEngine.display.Sprite;
 import com.collision.platformer.CollisionGroup;
 import GlobalGameData.GGD;
@@ -23,5 +25,6 @@ class Fireball extends Proyectile {
 	override function shoot(x:Float, y:Float, dirX:Float, dirY:Float, proyectileCollision:CollisionGroup):Void {
 		super.shoot(x,y,dirX,dirY,proyectileCollision);	
 		GGD.enemyProyectilesCollisions.add(collision);
+		SM.playFx(Assets.sounds.blueFireName, false);
 	}
 }

@@ -1,5 +1,7 @@
 package states;
 
+import com.soundLib.SoundManager.SM;
+import com.loading.basicResources.SoundLoader;
 import com.loading.basicResources.SpriteSheetLoader;
 import GlobalGameData;
 import kha.Assets;
@@ -52,10 +54,12 @@ class SuccessScreen extends State {
 			new Sequence("rangeAttack", [11])]));
 		atlas.add(new FontLoader(Assets.fonts.PixelOperator8_BoldName, 30));
 		resources.add(atlas);
+		resources.add(new SoundLoader(Assets.sounds.successName));
 	}
 
 	override function init() {
 		var image = new Sprite("victory");
+		SM.playFx(Assets.sounds.successName);
 		simulationLayer = new Layer();
 		stage.addChild(simulationLayer);
 		display = new Sprite(sprite);

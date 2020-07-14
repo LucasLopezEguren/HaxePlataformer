@@ -1,5 +1,7 @@
 package states;
 
+import com.soundLib.SoundManager.SM;
+import com.loading.basicResources.SoundLoader;
 import gameObjects.effects.RangeAttack;
 import com.gEngine.display.Text;
 import com.gEngine.display.StaticLayer;
@@ -135,6 +137,13 @@ class GameState extends State {
 			new Sequence("attack", [50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79])
 			]));
 		resources.add(atlas);
+		resources.add(new SoundLoader(Assets.sounds.blueFireName));
+		resources.add(new SoundLoader(Assets.sounds.hitName));
+		resources.add(new SoundLoader(Assets.sounds.powerUpName));
+		resources.add(new SoundLoader(Assets.sounds.oofName));
+		if (GGD.level == 3) {
+			resources.add(new SoundLoader(Assets.sounds.bossFightName));
+		}
 	}
 
 
@@ -147,6 +156,9 @@ class GameState extends State {
 	var scoreLevelDisplay:Text;
 	override function init() {
 		stageColor(0.5, .5, 0.5);
+		if (GGD.level == 3) {
+			SM.playMusic(Assets.sounds.bossFightName);
+		}
 		
 		dialogCollision = new CollisionGroup();
 		secretGateCollisions = new CollisionGroup();
@@ -361,6 +373,7 @@ class GameState extends State {
 	function playerVsTorch(torchCollision:ICollider, playerCollision:ICollider) {
 		player.addEffect(new RangeAttack(player));
 		var torch:Torch = cast torchCollision.userData;
+		SM.playFx(Assets.sounds.powerUpName);
 		torch.die();
 	}
 

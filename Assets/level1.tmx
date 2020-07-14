@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.2" tiledversion="1.3.4" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="53" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="32">
+<map version="1.2" tiledversion="1.3.4" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="53" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="33">
  <tileset firstgid="1" name="tiles2" tilewidth="32" tileheight="32" tilecount="13" columns="1">
   <image source="tiles2.png" width="32" height="416"/>
  </tileset>
@@ -34,7 +34,10 @@ they can confuse you.</property>
   <object id="22" type="dialog" x="38.041" y="45.5616" width="97.4552" height="104.106">
    <properties>
     <property name="text">Move with arrows 
- and jum with &quot;Space&quot;</property>
+ and jump with &quot;Space&quot;
+
+
+Make a leap of faith</property>
    </properties>
   </object>
   <object id="23" type="dialog" x="132.402" y="598.711" width="184.224" height="99.7673">
@@ -50,9 +53,9 @@ they can confuse you.</property>
   <object id="28" type="ghost" x="1383.96" y="160.522"/>
   <object id="29" type="dialog" x="635.659" y="520.62" width="498.76" height="177.859">
    <properties>
-    <property name="text">Becarefull with they spikes 
+    <property name="text">Becarefull with the spikes 
  they really hurt! 
-Ouch</property>
+  Ouch!</property>
    </properties>
   </object>
  </objectgroup>

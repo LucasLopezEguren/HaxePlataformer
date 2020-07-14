@@ -1,5 +1,7 @@
 package states;
 
+import com.soundLib.SoundManager.SM;
+import com.loading.basicResources.SoundLoader;
 import GlobalGameData.GGD;
 import com.loading.basicResources.SpriteSheetLoader;
 import kha.Color;
@@ -29,9 +31,11 @@ class Credits extends State {
 		var atlas:JoinAtlas = new JoinAtlas(1024, 1024);
 		atlas.add(new FontLoader(Assets.fonts.PixelOperator8_BoldName, 30));
 		resources.add(atlas);
+		resources.add(new SoundLoader(Assets.sounds.ffName));
 	}
 
 	override function init() {
+		SM.playMusic(Assets.sounds.ffName);
 		credits = new Text(Assets.fonts.PixelOperator8_BoldName);
 		credits.text = 
 		'\n' +
@@ -72,6 +76,11 @@ class Credits extends State {
 		'\n' +
 		'\n' +
 		'\n Sprite editor: Lucas Lopez' +
+		'\n' +
+		'\n' +
+		'\n' +
+		'\n Music & Sounds: Billie Elish, ' +
+		'\n Final Fantasy, GFX Sounds (YouTube)' +
 		'\n' +
 		'\n' +
 		'\n' +

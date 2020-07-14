@@ -1,5 +1,7 @@
 package gameObjects.effects;
 
+import kha.Assets;
+import com.soundLib.SoundManager.SM;
 import com.gEngine.display.Sprite;
 import com.collision.platformer.CollisionGroup;
 import GlobalGameData.GGD;
@@ -25,6 +27,7 @@ class BlueFireball extends Proyectile {
 		display.offsetX = (display.width()/2) - (display.scaleX * 0.5 * (display.width()/2));
 		display.smooth = false;
 		GGD.playerProyectilesCollisions.add(collision);
+		SM.playFx(Assets.sounds.blueFireName, false);
 	}
 
 	override function update(dt:Float){

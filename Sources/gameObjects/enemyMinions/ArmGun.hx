@@ -23,13 +23,4 @@ class ArmGun extends Entity {
 		firebeam.setBossSize(bossWidth, bossHeight);
 		firebeam.shoot(aX, aY, dirX, dirY, proyectilesCollisions);
 	}
-
-	var xRange:Int = 300;
-	public function stomp(aX:Float, aY:Float, dirX:Float, dirY:Float, times:Int):Void {
-		for(i in 0...times){
-			var meteor:Meteor = cast recycle(Meteor);
-			var randomX = aX - xRange + (Math.ceil(Math.random()*600));
-			meteor.shoot(randomX, 0, 0, dirY, proyectilesCollisions);
-		}
-	}
 }

@@ -1,5 +1,7 @@
 package gameObjects;
 
+import com.soundLib.SoundManager.SM;
+import kha.Assets;
 import com.framework.utils.LERP;
 import com.collision.platformer.Sides;
 import com.framework.utils.XboxJoystick;
@@ -120,8 +122,6 @@ class Player extends Entity {
 		collision.maxVelocityX = 500;
 		collision.maxVelocityY = 800;
 		collision.dragX = 0.9;
-
-		effects.add(new RangeAttack(this));
 	}
 
 	inline function hitX():Float {
@@ -256,6 +256,7 @@ class Player extends Entity {
 		if (isDying) return;
 		if (damageRecieve <= 0) return;
 		if (!invulerable) {
+			SM.playFx(Assets.sounds.oofName);
 			if (damageRecieve < maxHp / 4) {
 				receiveLowDamage = true;
 			} else {

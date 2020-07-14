@@ -1,5 +1,7 @@
 package gameObjects;
 
+import kha.Assets;
+import com.soundLib.SoundManager.SM;
 import kha.math.FastVector2;
 import com.framework.utils.Random;
 import com.collision.platformer.Sides;
@@ -70,6 +72,7 @@ class EnemyMinion extends Entity {
 			}
 			return;	
 		} 
+		
 		if(stunned && timeCounter <= stunnedTime) {
 			display.colorMultiplication(1,1,1,0.5);
 			hitDamage = 0;
@@ -98,6 +101,7 @@ class EnemyMinion extends Entity {
 	public function damage(damageReceived:Int):Void {
 		if (damageReceived == 0) return;
 		if (lastDamageReceived != damageReceived){
+			SM.playFx(Assets.sounds.hitName, false);
 			currentHp -= damageReceived;
 			if(currentHp <= 0){
 				addPoints();

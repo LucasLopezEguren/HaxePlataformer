@@ -1,5 +1,7 @@
 package states;
 
+import com.soundLib.SoundManager.SM;
+import com.loading.basicResources.SoundLoader;
 import GlobalGameData.GGD;
 import com.loading.basicResources.SpriteSheetLoader;
 import kha.Color;
@@ -55,10 +57,12 @@ class GameOver extends State {
 		atlas.add(new FontLoader("Kenney_Pixel", 24));
 		atlas.add(new FontLoader(Assets.fonts.PixelOperator8_BoldName, 30));
 		resources.add(atlas);
+		resources.add(new SoundLoader(Assets.sounds.gameOverName));
 	}
 
 	override function init() {
 		var image = new Sprite("gameOver");
+		SM.playFx(Assets.sounds.gameOverName);
 		simulationLayer = new Layer();
 		stage.addChild(simulationLayer);
 		display = new Sprite(sprite);

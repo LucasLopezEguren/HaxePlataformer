@@ -24,9 +24,7 @@ class IntroScreen extends State {
 	override function load(resources:Resources) {
 		var atlas:JoinAtlas = new JoinAtlas(2048, 2048);
 		atlas.add(new ImageLoader(Assets.images.hellsGateIntroName));
-		// atlas.add(new ImageLoader(Assets.images.selectCharacterBoardName));
 		atlas.add(new FontLoader(Assets.fonts.PixelOperator8_BoldName, 30));
-		// atlas.add(new SpriteSheetLoader(Assets.images.naviName, 50, 47, 0, [new Sequence("Idle", [0, 1, 2, 3, 4])]));
 		resources.add(new ImageLoader(Assets.images.logoName));
 		resources.add(atlas);
 	}
@@ -38,6 +36,7 @@ class IntroScreen extends State {
 	var time:Float = 0;
 	var logo:Sprite;
 	var pressStart:Text;
+	var levelDisplay:Text;
 	var background:Sprite;
 
 	override function init() {
@@ -66,17 +65,35 @@ class IntroScreen extends State {
 		pressStart.setColorMultiply(9 / 10, 9 / 10, 9 / 10, 1);
 
 		hudLayer.addChild(pressStart);
+
+		levelDisplay = new Text(Assets.fonts.PixelOperator8_BoldName);
+		levelDisplay.text = "Level " + GGD.level;
+		levelDisplay.x = (GEngine.virtualWidth / 2 - (levelDisplay.width() * 0.5) * (2 / 3)) - 7;
+		levelDisplay.y = GEngine.virtualHeight / 2 + 60;
+		levelDisplay.setColorMultiply(100 / 255, 20 / 255, 100 / 255, 0);
+		hudLayer.addChild(levelDisplay);
 	}
 
 	var changeScreen:Bool = false;
 	var isDrawn:Bool = false;
 	var more:Bool = false;
+	var debugging:Bool = false;
 	var music:Bool = true;
 	var transcparency:Float = 0;
 
 	override function update(dt:Float) {
 		super.update(dt);
 		GlobalGameData.soundControllWithoutIcon();
+		if (Input.i.isKeyCodePressed(KeyCode.T)) debugging = !debugging;
+		if (debugging){
+			levelDisplay.setColorMultiply(100 / 255, 20 / 255, 100 / 255, 1);
+			levelDisplay.text = "Level " + GGD.level;
+			if (Input.i.isKeyCodePressed(KeyCode.Up)) GGD.level = 1 + (GGD.level % GGD.maxLevel);
+			if (Input.i.isKeyCodePressed(KeyCode.Down)) GGD.level = 1 - (GGD.level % GGD.maxLevel);
+			
+		} else {
+			levelDisplay.setColorMultiply(100 / 255, 20 / 255, 100 / 255, 0);
+		}
 		if (Input.i.isKeyCodePressed(KeyCode.Return) && !changeScreen) {
 			changeScreen = true;
 			pressStart.removeFromParent();
@@ -111,6 +128,6 @@ class IntroScreen extends State {
 	}
 
 	function startGame() {
-		changeState(new GameState('3'));
+		changeState(new GameState(''+GGD.level));
 	}
 }

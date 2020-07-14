@@ -15,7 +15,7 @@ class Proyectile extends Entity {
 	var currentTime:Float = 0;
 	var dirX:Float;
 	var speed:Float = 150;
-	public var hitDamage(get, null):Int = 60;
+	public var hitDamage(get, null):Int = 15;
 	public function get_hitDamage():Int {
 		return hitDamage;
 	}

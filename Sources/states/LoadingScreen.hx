@@ -19,7 +19,7 @@ class LoadingScreen extends State {
 
 	override function load(resources:Resources) {
 		resources.add(new ImageLoader(Assets.images.logoName));
-		// resources.add(new SoundLoader(Assets.sounds.backgroundName));
+		resources.add(new SoundLoader(Assets.sounds.backgroundName));
 	}
 
 	var allLoaded:Bool;
@@ -64,8 +64,8 @@ class LoadingScreen extends State {
         bar.setColor(255, barColor, 0);
 		if (allLoaded) {
 			Simulation.i.manualLoad = true;
-			// SM.playMusic("background");
-			// SM.musicVolume(2 / 100);
+			SM.playMusic(Assets.sounds.backgroundName);
+			SM.musicVolume(50 / 100);
 			startGame();
 		}
 	}
